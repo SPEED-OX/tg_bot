@@ -1,18 +1,17 @@
-# config.py
+import os
 
-# Your Telegram API credentials (from https://my.telegram.org)
+# Base directory (where this config.py is located)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# API credentials
 API_ID = 23940372
 API_HASH = "8caf9cc524474491f7f525f9d48c4b00"
-
-# Your bot token (from @BotFather)
 BOT_TOKEN = "7667963218:AAEpXQmQXFTZL5n0xYDeStZJZ1NVQd3l0Fc"
 
-# Database file path
-DB_PATH = "monitor.db"
+# Paths
+USER_SESSION = os.path.join(BASE_DIR, "user_account")  # no .session extension needed
+BOT_SESSION = os.path.join(BASE_DIR, "bot_account")
+DB_PATH = os.path.join(BASE_DIR, "monitor.db")
 
-# Session file names
-USER_SESSION = "user_account"
-BOT_SESSION = "bot_account"
-
-# Default keywords to monitor
+# Default keywords
 DEFAULT_KEYWORDS = ["mediafire.com"]
