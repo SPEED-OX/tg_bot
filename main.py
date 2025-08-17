@@ -54,7 +54,7 @@ def is_monitoring():
 
 @bot_client.on(events.NewMessage(pattern=r"^/start$"))
 async def start_cmd(event):
-        if event.sender_id not in USER_ID:
+    if event.sender_id not in USER_ID:
         return await event.reply("🚫 You are not authorized to use this bot.")
     await event.reply("Bot started ✅\nUse /help for commands.")
 
