@@ -1,6 +1,8 @@
+# main.py
 import asyncio
 import sqlite3
-from telethon import TelegramClient, events
+from telethon import events
+from telethon.tl.types import PeerUser
 import config
 
 # Database setup
@@ -17,11 +19,11 @@ if cursor.fetchone()[0] == 0:
     cursor.execute("INSERT INTO status VALUES (0)")
     conn.commit()
 
-# Clients
-user_client = TelegramClient(config.USER_SESSION, config.API_ID, config.API_HASH)
-bot_client = TelegramClient(config.BOT_SESSION, config.API_ID, config.API_HASH)
+# Use clients from config.py
+user_client = config.user_client
+bot_client = config.bot_client
 
-# Helpers
+# --- Helpers ---
 def add_keyword(keyword):
     cursor.execute("INSERT OR IGNORE INTO keywords VALUES (?)", (keyword,))
     conn.commit()
@@ -54,7 +56,7 @@ def is_monitoring():
     cursor.execute("SELECT monitoring FROM status")
     return cursor.fetchone()[0] == 1
 
-# BOT COMMANDS
+# --- Bot Commands ---
 @bot_client.on(events.NewMessage(pattern=r"^/start$"))
 async def start_cmd(event):
     await event.reply("Bot started ✅\nUse /help for commands.")
@@ -130,7 +132,7 @@ async def help_cmd(event):
     )
     await event.reply(help_text)
 
-# USER MONITOR
+# --- User Monitor ---
 @user_client.on(events.NewMessage)
 async def monitor_messages(event):
     if not is_monitoring():
@@ -139,12 +141,19 @@ async def monitor_messages(event):
         text = (event.raw_text or "").lower()
         for kw in get_keywords():
             if kw.lower() in text:
-                await user_client.forward_messages("ChatAuditBot",event.message)
+                try:
+                    bot_id = int(config.BOT_TOKEN.split(":")[0])
+                    bot_entity = await user_client.get_entity(PeerUser(bot_id))
+                    await user_client.forward_messages(bot_entity, event.message)
+                except Exception as e:
+                    print(f"Forwarding error: {e}")
                 break
 
+# --- Main Runner ---
 async def main():
     await user_client.start()
-    await bot_client.start(bot_token=config.BOT_TOKEN)
+    if bot_client:
+        await bot_client.start(bot_token=config.BOT_TOKEN)
     print("Bot & user client running.")
     await asyncio.gather(
         user_client.run_until_disconnected(),
