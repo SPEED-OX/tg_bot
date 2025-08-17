@@ -1,11 +1,9 @@
-# main.py
 import asyncio
 import sqlite3
 from telethon import events
 from telethon.tl.types import PeerUser
 import config
 
-# Database setup
 conn = sqlite3.connect(config.DB_PATH)
 cursor = conn.cursor()
 cursor.execute("CREATE TABLE IF NOT EXISTS keywords (keyword TEXT UNIQUE)")
@@ -13,17 +11,14 @@ cursor.execute("CREATE TABLE IF NOT EXISTS chats (chat_id INTEGER UNIQUE)")
 cursor.execute("CREATE TABLE IF NOT EXISTS status (monitoring INTEGER)")
 conn.commit()
 
-# Ensure status row exists
 cursor.execute("SELECT COUNT(*) FROM status")
 if cursor.fetchone()[0] == 0:
     cursor.execute("INSERT INTO status VALUES (0)")
     conn.commit()
 
-# Use clients from config.py
 user_client = config.user_client
 bot_client = config.bot_client
 
-# --- Helpers ---
 def add_keyword(keyword):
     cursor.execute("INSERT OR IGNORE INTO keywords VALUES (?)", (keyword,))
     conn.commit()
@@ -109,7 +104,7 @@ async def status_cmd(event):
         try:
             entity = await user_client.get_entity(cid)
             chat_lines.append(f"{cid} — {entity.title}")
-        except:
+        except Exception:
             chat_lines.append(f"{cid} — [Name Unavailable]")
 
     msg = f"**Monitoring:** {status}\n\n**Chats:**\n" + \
@@ -132,7 +127,6 @@ async def help_cmd(event):
     )
     await event.reply(help_text)
 
-# --- User Monitor ---
 @user_client.on(events.NewMessage)
 async def monitor_messages(event):
     if not is_monitoring():
@@ -149,7 +143,6 @@ async def monitor_messages(event):
                     print(f"Forwarding error: {e}")
                 break
 
-# --- Main Runner ---
 async def main():
     await user_client.start()
     if bot_client:
@@ -160,6 +153,6 @@ async def main():
         bot_client.run_until_disconnected()
     )
 
-if name == "main":
+if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())
