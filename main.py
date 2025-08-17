@@ -18,6 +18,7 @@ if cursor.fetchone()[0] == 0:
 
 user_client = config.user_client
 bot_client = config.bot_client
+USER_ID = [1975169034,7249228248]
 
 def add_keyword(keyword):
     cursor.execute("INSERT OR IGNORE INTO keywords VALUES (?)", (keyword,))
@@ -51,9 +52,10 @@ def is_monitoring():
     cursor.execute("SELECT monitoring FROM status")
     return cursor.fetchone()[0] == 1
 
-# --- Bot Commands ---
 @bot_client.on(events.NewMessage(pattern=r"^/start$"))
 async def start_cmd(event):
+        if event.sender_id not in USER_ID:
+        return await event.reply("🚫 You are not authorized to use this bot.")
     await event.reply("Bot started ✅\nUse /help for commands.")
 
 @bot_client.on(events.NewMessage(pattern=r"^/stop$"))
