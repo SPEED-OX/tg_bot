@@ -2,7 +2,7 @@ import os
 from telethon.sessions import StringSession
 from telethon import TelegramClient
 
-BASE_DIR = os.path.dirname(os.path.abspath(file))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Load from Railway environment variables
 API_ID = int(os.getenv("API_ID", "0"))
