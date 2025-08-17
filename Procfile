@@ -1,1 +1,1 @@
-worker: python main_botid.py
+worker: python main.py
