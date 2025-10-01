@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>ControllerBot Clone Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .card { border: 1px solid #ccc; border-radius: 8px; padding: 16px; margin: 10px 0; }
+    button { padding: 10px 20px; margin: 5px; }
+  </style>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <h2>📊 ControllerBot Clone</h2>
+  <div class="card">
+    <p>Hello, <span id="user"></span></p>
+    <button onclick="sendData()">Send Test Data</button>
+  </div>
+  <script>
+    const tg = window.Telegram.WebApp;
+    document.getElementById("user").innerText = tg.initDataUnsafe.user?.first_name || "User";
+    function sendData() {
+      tg.sendData(JSON.stringify({ action: "test", value: 123 }));
+    }
+    tg.ready();
+  </script>
+</body>
+</html>
