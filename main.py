@@ -1,3 +1,4 @@
+# main.py
 from multiprocessing import Process
 from bot import run_bot
 

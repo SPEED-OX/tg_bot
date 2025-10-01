@@ -1,16 +1,26 @@
-from telegram.ext import Application, CommandHandler
+Botpy
+# bot.py
 import os
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-
-async def start(update, context):
-    await update.message.reply_text("Hello! Bot is running ✅")
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 def run_bot():
+    BOT_TOKEN = os.getenv("BOT_TOKEN")
     if not BOT_TOKEN:
-        raise ValueError("BOT_TOKEN not set in env vars!")
+        raise ValueError("BOT_TOKEN not found in environment variables!")
 
     app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
 
-    app.run_polling()   # no Updater here
+    # Example /start command
+    async def start(update, context):
+        await update.message.reply_text("🤖 Bot is alive and running!")
+
+    # Example echo handler
+    async def echo(update, context):
+        await update.message.reply_text(update.message.text)
+
+    # Register handlers
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+
+    # Start bot
+    app.run_polling()
