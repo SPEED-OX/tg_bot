@@ -9,7 +9,7 @@ import logging
 
 # Corrected imports for flat structure  
 from models import DatabaseManager
-from config import IST, BOT_NAME
+from config import IST
 
 # Rest of your webapp.py code remains the same...
 
