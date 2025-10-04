@@ -7,7 +7,8 @@ from datetime import timezone, timedelta
 # Bot configuration
 BOT_TOKEN = os.getenv('BOT_TOKEN', 'your-bot-token-here')
 BOT_OWNER_ID = int(os.getenv('BOT_OWNER_ID', '0'))
-
+BOT_NAME = "ChatAudit Bot"
+BOT_DESCRIPTION = "Advanced Telegram channel management bot"
 # Database configuration
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///controller_bot.db')
 

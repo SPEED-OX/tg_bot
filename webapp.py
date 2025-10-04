@@ -1,17 +1,13 @@
 """
-webapp.py - CORRECTED IMPORTS for flat directory structure
-Replace the import section at the top of your webapp.py with this:
+Flask Web Application for ChatAudit Bot Dashboard
+This Flask app serves the web interface.
 """
 from flask import Flask, render_template, request, jsonify
 from datetime import datetime, timedelta
 import os
 import logging
-
-# Corrected imports for flat structure  
-from models import DatabaseManager
+from database.models import DatabaseManager
 from config import IST
-
-# Rest of your webapp.py code remains the same...
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
