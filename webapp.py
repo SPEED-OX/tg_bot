@@ -1,13 +1,17 @@
 """
-Flask web application for Controller Bot Dashboard
-Optimized for Railway deployment with Gunicorn
+webapp.py - CORRECTED IMPORTS for flat directory structure
+Replace the import section at the top of your webapp.py with this:
 """
 from flask import Flask, render_template, request, jsonify
 from datetime import datetime, timedelta
 import os
 import logging
-from database.models import DatabaseManager
-from config import IST
+
+# Corrected imports for flat structure  
+from models import DatabaseManager
+from config import IST, BOT_NAME
+
+# Rest of your webapp.py code remains the same...
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

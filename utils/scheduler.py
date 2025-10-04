@@ -1,15 +1,18 @@
 """
-Smart Scheduler for Controller Bot
-Optimized timing - no constant database polling
+scheduler.py - CORRECTED IMPORTS for flat directory structure
+Replace the import section at the top of your scheduler.py with this:
 """
 import threading
 import time
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import logging
-from database.models import DatabaseManager
+
+# Corrected imports for flat structure
+from models import DatabaseManager
 from config import IST, TIMER_CHECK_INTERVAL, NEAR_TIME_CHECK_INTERVAL, DAILY_CHECK_TIME
 
+# Rest of your scheduler.py code remains the same...
 logger = logging.getLogger(__name__)
 
 class SmartScheduler:

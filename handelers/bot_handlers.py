@@ -1,6 +1,6 @@
 """
-Main bot handlers for Controller Bot
-Handles commands and message processing
+bot_handlers.py - CORRECTED IMPORTS for flat directory structure
+Replace the import section at the top of your bot_handlers.py with this:
 """
 import telebot
 from telebot.types import BotCommand
@@ -8,11 +8,15 @@ import logging
 import re
 from typing import Dict, Optional
 from datetime import datetime
-from database.models import DatabaseManager
-from handlers.menu_handlers import MenuHandler
-from utils.scheduler import SmartScheduler
-from utils.time_parser import parse_time_input, TIME_FORMAT_HELP
+
+# Corrected imports for flat structure
+from models import DatabaseManager
+from menu_handlers import MenuHandler
+from scheduler import SmartScheduler  
+from time_parser import parse_time_input, TIME_FORMAT_HELP
 from config import BOT_OWNER_ID, IST
+
+# Rest of your bot_handlers.py code remains the same...
 
 logger = logging.getLogger(__name__)
 

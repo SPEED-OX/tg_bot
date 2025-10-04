@@ -1,6 +1,6 @@
 """
-Menu system handlers for Controller Bot
-Implements hierarchical inline keyboard system
+menu_handlers.py - CORRECTED IMPORTS for flat directory structure  
+Replace the import section at the top of your menu_handlers.py with this:
 """
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
@@ -8,9 +8,13 @@ from datetime import datetime
 import json
 import logging
 from typing import Dict, Optional, List
-from database.models import DatabaseManager
-from utils.time_parser import parse_time_input, format_time_display, TIME_FORMAT_HELP
+
+# Corrected imports for flat structure
+from models import DatabaseManager
+from time_parser import parse_time_input, format_time_display, TIME_FORMAT_HELP
 from config import BOT_OWNER_ID, WEBAPP_URL, IST
+
+# Rest of your menu_handlers.py code remains the same...
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 """
-Main Controller Bot Application
-Optimized for Railway deployment with smart scheduling
+main.py - CORRECTED IMPORTS for flat directory structure
+Replace the import section at the top of your main.py with this:
 """
 import os
 import sys
@@ -10,6 +10,13 @@ import signal
 from datetime import datetime
 import telebot
 from telebot.types import BotCommand
+
+# Corrected imports for flat structure
+from config import BOT_TOKEN, BOT_OWNER_ID, IST, BOT_NAME
+from models import DatabaseManager
+from bot_handlers import BotHandlers
+
+# Rest of your main.py code remains the same...
 
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
