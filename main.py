@@ -12,9 +12,9 @@ import telebot
 from telebot.types import BotCommand
 
 # Corrected imports for flat structure
-from config import BOT_TOKEN, BOT_OWNER_ID, IST, BOT_NAME
-from models import DatabaseManager
-from bot_handlers import BotHandlers
+from config import BOT_TOKEN, BOT_OWNER_ID, IST
+from database.models import DatabaseManager
+from handlers.bot_handlers import BotHandlers
 
 # Rest of your main.py code remains the same...
 
