@@ -1,6 +1,6 @@
 """
-CORRECTED Bot handlers to work with proper button types
-Handles both callback queries and text messages from button menus
+FIXED Bot handlers with corrected /help command markdown
+Fixes the Telegram API parsing error
 """
 import telebot
 from telebot.types import BotCommand
@@ -111,100 +111,96 @@ class BotHandlers:
         self.menu_handler.show_main_menu(message.chat.id, user_id)
 
     def handle_help(self, message):
-        """Handle /help command - COMPLETE universal help as specified"""
+        """Handle /help command - FIXED markdown formatting"""
         user_id = message.from_user.id
-        help_text = f"""
-🤖 **ChatAudit Bot - Complete Guide**
 
-**🚀 Quick Start:**
+        # FIXED: Split help into smaller chunks to avoid markdown parsing issues
+        help_text_1 = f"""🤖 *ChatAudit Bot - Complete Guide*
+
+*🚀 Quick Start:*
 1. Add me as admin to your channel
 2. Use /addchannel @yourchannel  
 3. Use main menu buttons to create posts
 
-**📋 Universal Commands:**
+*📋 Universal Commands:*
 • /start - Open main menu with inline buttons
 • /help - Show this complete help guide  
 • /addchannel @channel - Add channel to manage
 • /channels - View your added channels
 
-**🎛️ Button Types & Menu Structure:**
+*🎛️ Button Types & Menu Structure:*
 
-**📱 INLINE KEYBOARD (Main Menu):**
-🏠 **Start** - Welcome and getting started info
-👥 **User** - User management (owner only)
-📝 **New Post** - Channel selection for posting
-📅 **Schedules** - Manage scheduled tasks  
-📊 **Dashboard** - Web interface
+*📱 INLINE KEYBOARD (Main Menu):*
+🏠 *Start* - Welcome and getting started info
+👥 *User* - User management (owner only)
+📝 *New Post* - Channel selection for posting
+📅 *Schedules* - Manage scheduled tasks  
+📊 *Dashboard* - Web interface"""
 
-**🔘 BUTTON MENU (Sub-menus):**
+        help_text_2 = f"""*🔘 BUTTON MENU (Sub-menus):*
 
-**👥 User Management** (Button Menu - Owner only)
-├── **Users** - List whitelisted users with @username
-├── **Permit <user_id>** - Add user to whitelist (ignores - signs)
+*👥 User Management* (Button Menu - Owner only)
+├── *Users* - List whitelisted users with @username
+├── *Permit <user_id>* - Add user to whitelist (ignores - signs)
 │   Format: Send `123456789` or `-123456789`
-├── **Remove <user_id>** - Remove user from whitelist (ignores - signs)  
+├── *Remove <user_id>* - Remove user from whitelist (ignores - signs)  
 │   Format: Send `123456789` or `-123456789`
-└── **Back** - Return to main menu
+└── *Back* - Return to main menu
 
-**📝 New Post** (Button Menu after channel selection)
-├── **Send** - Opens inline buttons for send options
-├── **Cancel** - Cancel current post creation
-├── **Preview** - Show preview of your post
-├── **Delete All** - Clear all draft content
-└── **Back** - Return to channel selection
+*📝 New Post* (Button Menu after channel selection)
+├── *Send* - Opens inline buttons for send options
+├── *Cancel* - Cancel current post creation
+├── *Preview* - Show preview of your post
+├── *Delete All* - Clear all draft content
+└── *Back* - Return to channel selection"""
 
-**📅 Schedules** (Button Menu)
-├── **Scheduled Posts** - View upcoming posts & timings
-├── **Self-Destruct Timings** - View auto-delete tasks & timings
-├── **Cancel** - Opens inline buttons for cancel options
-└── **Back** - Return to main menu
+        help_text_3 = f"""*📅 Schedules* (Button Menu)
+├── *Scheduled Posts* - View upcoming posts & timings
+├── *Self-Destruct Timings* - View auto-delete tasks & timings
+├── *Cancel* - Opens inline buttons for cancel options
+└── *Back* - Return to main menu
 
-**⚡ INLINE BUTTONS (Action buttons):**
+*⚡ INLINE BUTTONS (Action buttons):*
 
-**Send Options** (Inline buttons from Send):
-├── **Schedule Post** - Set date/time for posting
+*Send Options* (Inline buttons from Send):
+├── *Schedule Post* - Set date/time for posting
 │   Format: `dd/mm hh:mm` (5/10 15:00) or `hh:mm` (15:00)
-├── **Self-Destruct** - Auto-delete after specified time
+├── *Self-Destruct* - Auto-delete after specified time
 │   Format: `dd/mm hh:mm` (5/10 15:00) or `hh:mm` (15:00)
-├── **Post Now** - Send immediately to channel
-└── **Back** - Return to post button menu
+├── *Post Now* - Send immediately to channel
+└── *Back* - Return to post button menu
 
-**Cancel Options** (Inline buttons from Cancel):
-├── **Self-Destruct** - Cancel self-destruct task
-├── **Scheduled Post** - Cancel scheduled post
-└── **Back** - Return to schedules button menu
+*Cancel Options* (Inline buttons from Cancel):
+├── *Self-Destruct* - Cancel self-destruct task
+├── *Scheduled Post* - Cancel scheduled post
+└── *Back* - Return to schedules button menu"""
 
-**⏰ Time Format Guide:**
-• **Full Format:** `dd/mm hh:mm` - Specific date and time
+        help_text_4 = f"""*⏰ Time Format Guide:*
+• *Full Format:* `dd/mm hh:mm` - Specific date and time
   Example: `5/10 15:00` = October 5th at 3:00 PM IST
-• **Time Only:** `hh:mm` - Same day if time hasn't passed
+• *Time Only:* `hh:mm` - Same day if time hasn't passed
   Example: `15:00` = Today at 3:00 PM (or tomorrow if past)
-• **All times in IST (Indian Standard Time)**
-• **24-hour format:** 00:00 to 23:59
+• *All times in IST (Indian Standard Time)*
+• *24-hour format:* 00:00 to 23:59
 
-**📝 Post Content Features:**
-• **Text Formatting:**
-  - **Bold:** **text** or __text__
+*📝 Post Content Features:*
+• *Text Formatting:*
+  - *Bold:* **text** or __text__
   - *Italic:* *text* or _text_  
-  - `Code:` `text` or ```code block```
+  - *Code:* `text` or ```code block```
   - Links: [text](https://url.com)
 
-• **Inline Buttons:** 
+• *Inline Buttons:* 
   Format: `Button Text | https://url.com` (one per line)
-  Example:
-  ```
-  Visit Website | https://example.com
-  Download App | https://app.com/download
-  ```
 
-• **Media Support:**
+• *Media Support:*
   - Photos with captions
   - Videos with captions  
-  - Documents with descriptions
+  - Documents with descriptions"""
 
-**🔧 Channel Management:**
+        help_text_5 = f"""*🔧 Channel Management:*
 
-**Adding Channels:**
+*Adding Channels:*
 1. Add me as admin to your Telegram channel
 2. Give me these permissions:
    ✅ Post messages
@@ -213,52 +209,77 @@ class BotHandlers:
 3. Use `/addchannel @channelname`
 4. Channel will be added to your list
 
-**Examples:**
+*Examples:*
 • `/addchannel @mynewschannel`
 • `/addchannel @techupdate`
 
-**Viewing Channels:**
+*Viewing Channels:*
 • Use `/channels` to see all your added channels
 • Use main menu → New Post to select channel for posting
 
-**👥 User Management (Owner Only):**
+*👥 User Management (Owner Only):*
 
-**Getting User IDs:**
+*Getting User IDs:*
 1. Ask user to message @userinfobot
 2. Bot will reply with their user ID
 3. Use that ID in permit/remove commands
 
-**Whitelisting Users:**
+*Whitelisting Users:*
 • Use main menu → User → Permit <user_id>
 • Both `123456789` and `-123456789` formats work
-• User gets notified when added
+• User gets notified when added"""
 
-**💡 Navigation Tips:**
-• **Inline keyboards** appear above the message (floating buttons)
-• **Button menus** appear below the message (keyboard replacement)
-• **Inline buttons** are for quick actions
+        help_text_6 = f"""*💡 Navigation Tips:*
+• *Inline keyboards* appear above the message (floating buttons)
+• *Button menus* appear below the message (keyboard replacement)
+• *Inline buttons* are for quick actions
 • Use "Back" buttons to navigate between menus
 • /start always returns to main menu
 
-**🛠️ Troubleshooting:**
-• **Bot not posting?** Check admin permissions in channel
-• **Can't add channel?** Ensure bot is admin first
-• **Button menus not showing?** Try /start to reset
-• **Time format issues?** Use dd/mm hh:mm or hh:mm (IST)
-• **Commands not working?** Check if you're whitelisted
+*🛠️ Troubleshooting:*
+• *Bot not posting?* Check admin permissions in channel
+• *Can't add channel?* Ensure bot is admin first
+• *Button menus not showing?* Try /start to reset
+• *Time format issues?* Use dd/mm hh:mm or hh:mm (IST)
+• *Commands not working?* Check if you're whitelisted
 
-**📊 Current User Status:**
-**Name:** {message.from_user.first_name or 'Unknown'}
-**Username:** @{message.from_user.username or 'None'}
-**Status:** {'✅ Authorized' if self.is_authorized(user_id) else '❌ Not Authorized'}
-**User ID:** `{user_id}`
+*📊 Current User Status:*
+*Name:* {message.from_user.first_name or 'Unknown'}
+*Username:* @{message.from_user.username or 'None'}
+*Status:* {'✅ Authorized' if self.is_authorized(user_id) else '❌ Not Authorized'}
+*User ID:* `{user_id}`
 
-**🎯 Ready to manage your channels with 3 button types!**
+*🎯 Ready to manage your channels with 3 button types!*
 
-Use /start to open the main menu with all these features.
-        """
+Use /start to open the main menu with all these features."""
 
-        self.bot.send_message(message.chat.id, help_text, parse_mode='Markdown')
+        # Send help in multiple parts to avoid markdown parsing issues
+        try:
+            self.bot.send_message(message.chat.id, help_text_1, parse_mode='Markdown')
+            self.bot.send_message(message.chat.id, help_text_2, parse_mode='Markdown')
+            self.bot.send_message(message.chat.id, help_text_3, parse_mode='Markdown')
+            self.bot.send_message(message.chat.id, help_text_4, parse_mode='Markdown')
+            self.bot.send_message(message.chat.id, help_text_5, parse_mode='Markdown')
+            self.bot.send_message(message.chat.id, help_text_6, parse_mode='Markdown')
+        except Exception as e:
+            logger.error(f"Error sending help: {e}")
+            # Fallback: send without markdown
+            fallback_text = """ChatAudit Bot - Complete Guide
+
+Quick Start:
+1. Add me as admin to your channel
+2. Use /addchannel @yourchannel  
+3. Use main menu buttons to create posts
+
+Universal Commands:
+• /start - Open main menu
+• /help - Show this help
+• /addchannel @channel - Add channel
+• /channels - View channels
+
+For detailed help, try /start and explore the menus!"""
+
+            self.bot.send_message(message.chat.id, fallback_text)
 
     def handle_addchannel(self, message):
         """Handle /addchannel command"""
@@ -271,16 +292,15 @@ Use /start to open the main menu with all these features.
         # Parse command
         parts = message.text.split()
         if len(parts) < 2:
-            help_text = """
-📺 **Add Channel - Help**
+            help_text = """📺 *Add Channel - Help*
 
-**Usage:** `/addchannel @channelname`
+*Usage:* `/addchannel @channelname`
 
-**Examples:**
+*Examples:*
 • `/addchannel @mynewschannel`
 • `/addchannel @techupdate`
 
-**Steps:**
+*Steps:*
 1. Add me as admin to your channel
 2. Give me these permissions:
    ✅ Post messages
@@ -288,8 +308,7 @@ Use /start to open the main menu with all these features.
    ✅ Delete messages
 3. Use the command above
 
-**Note:** Channel username must start with @
-            """
+*Note:* Channel username must start with @"""
             self.bot.send_message(message.chat.id, help_text, parse_mode='Markdown')
             return
 
@@ -345,23 +364,21 @@ Use /start to open the main menu with all these features.
         channels = self.db.get_user_channels(user_id)
 
         if not channels:
-            text = """
-📺 **Your Channels**
+            text = """📺 *Your Channels*
 
 📭 You haven't added any channels yet.
 
-**To add a channel:**
+*To add a channel:*
 1. Add me as admin to your channel
 2. Use: `/addchannel @yourchannel`
 
-**Example:**
-`/addchannel @mynewschannel`
-            """
+*Example:*
+`/addchannel @mynewschannel`"""
         else:
-            text = "📺 **Your Channels:**\n\n"
+            text = "📺 *Your Channels:*\n\n"
             for i, channel in enumerate(channels, 1):
                 channel_name = channel['channel_name'] or 'Unknown'
-                text += f"{i}. **{channel_name}**\n"
+                text += f"{i}. *{channel_name}*\n"
                 text += f"   Username: {channel['channel_username']}\n"
                 text += f"   Added: {channel['created_at'][:10]}\n\n"
 
@@ -468,7 +485,7 @@ Use /start to open the main menu with all these features.
         # Parse inline buttons from text
         self.parse_inline_buttons(state)
 
-        self.bot.reply_to(message, "✅ Content received! Use the **Send** button to choose posting options.")
+        self.bot.reply_to(message, "✅ Content received! Use the *Send* button to choose posting options.", parse_mode='Markdown')
 
     def parse_inline_buttons(self, state):
         """Parse inline buttons from post text"""
@@ -516,10 +533,11 @@ Use /start to open the main menu with all these features.
 
             self.bot.reply_to(message, 
                 f"✅ Post scheduled!\n\n"
-                f"**Time:** {scheduled_time.strftime('%d/%m/%Y %H:%M IST')}\n"
-                f"**Channel:** {state.selected_channel['channel_name']}\n"
-                f"**ID:** {post_id}\n\n"
-                f"You can manage this in /start → Schedules menu."
+                f"*Time:* {scheduled_time.strftime('%d/%m/%Y %H:%M IST')}\n"
+                f"*Channel:* {state.selected_channel['channel_name']}\n"
+                f"*ID:* {post_id}\n\n"
+                f"You can manage this in /start → Schedules menu.",
+                parse_mode='Markdown'
             )
 
             # Clear state and return to main menu
@@ -546,9 +564,10 @@ Use /start to open the main menu with all these features.
         # For now, just acknowledge (full implementation would need actual posting + scheduling)
         self.bot.reply_to(message, 
             f"✅ Self-destruct scheduled!\n\n"
-            f"**Delete Time:** {destruct_time.strftime('%d/%m/%Y %H:%M IST')}\n"
-            f"**Channel:** {state.selected_channel['channel_name']}\n\n"
-            f"Post will be deleted automatically at the specified time."
+            f"*Delete Time:* {destruct_time.strftime('%d/%m/%Y %H:%M IST')}\n"
+            f"*Channel:* {state.selected_channel['channel_name']}\n\n"
+            f"Post will be deleted automatically at the specified time.",
+            parse_mode='Markdown'
         )
 
         # Clear state and return to main menu
