@@ -1,5 +1,6 @@
 """
 Gunicorn configuration for Railway deployment
+Optimized for running both bot and webapp together
 """
 import os
 
@@ -33,3 +34,9 @@ pidfile = None
 user = None
 group = None
 tmp_upload_dir = None
+
+# Preload app for better performance
+preload_app = True
+
+# Keep alive settings for Railway
+worker_tmp_dir = "/dev/shm"

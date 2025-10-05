@@ -29,7 +29,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-class ControllerBot:
+class ChatAuditBot:
     def __init__(self):
         if not BOT_TOKEN or BOT_TOKEN == 'your-bot-token-here':
             raise ValueError("❌ BOT_TOKEN not set in environment variables")
@@ -49,7 +49,7 @@ class ControllerBot:
         # Setup graceful shutdown
         self.setup_signal_handlers()
 
-        logger.info("🤖 Controller Bot initialized successfully")
+        logger.info("🤖 ChatAudit Bot initialized successfully")
 
     def setup_signal_handlers(self):
         """Setup graceful shutdown handlers"""
@@ -76,7 +76,7 @@ class ControllerBot:
 
     def run(self):
         """Start the bot with error recovery"""
-        logger.info("🚀 Starting Controller Bot...")
+        logger.info("🚀 Starting ChatAudit Bot...")
 
         # Add owner to whitelist if not already
         if BOT_OWNER_ID:
@@ -87,11 +87,12 @@ class ControllerBot:
         try:
             self.bot.send_message(
                 BOT_OWNER_ID,
-                f"🤖 **Controller Bot Started!**\n\n"
+                f"🤖 **ChatAudit Bot Started!**\n\n"
                 f"**Time:** {datetime.now(IST).strftime('%d/%m/%Y %H:%M:%S IST')}\n"
                 f"**Status:** ✅ Online\n"
                 f"**Features:** All systems operational\n\n"
-                f"Bot is ready to manage your channels! 🎯"
+                f"Bot is ready to manage your channels! 🎯\n\n"
+                f"**💡 Quick Start:** Use /help for complete guide"
             )
         except Exception as e:
             logger.warning(f"⚠️ Could not send startup notification: {e}")
@@ -143,7 +144,7 @@ def main():
             sys.exit(1)
 
         # Initialize and run bot
-        bot = ControllerBot()
+        bot = ChatAuditBot()
         bot.run()
 
     except Exception as e:
