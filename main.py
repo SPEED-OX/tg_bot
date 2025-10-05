@@ -1,155 +1,64 @@
 """
-Main ChatAudit Bot Application
-Optimized for Railway deployment with smart scheduling
+ChatAudit Bot - Main Entry Point
+Clean bot initialization with organized imports
 """
 import os
 import sys
-import logging
-import time
-import signal
+import threading
 from datetime import datetime
-import telebot
-from telebot.types import BotCommand
 
-# Add project root to path
+# Add current directory to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from config import BOT_TOKEN, BOT_OWNER_ID, IST
+from config import BOT_TOKEN, BOT_OWNER_ID, BOT_NAME, IST
 from database.models import DatabaseManager
 from handlers.bot_handlers import BotHandlers
 
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('bot.log'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
-
-class ChatAuditBot:
-    def __init__(self):
-        if not BOT_TOKEN or BOT_TOKEN == 'your-bot-token-here':
-            raise ValueError("❌ BOT_TOKEN not set in environment variables")
-
-        if not BOT_OWNER_ID:
-            raise ValueError("❌ BOT_OWNER_ID not set in environment variables")
-
-        # Initialize bot
-        self.bot = telebot.TeleBot(BOT_TOKEN, parse_mode='Markdown')
-
-        # Initialize database
-        self.db = DatabaseManager()
-
-        # Initialize handlers (includes scheduler)
-        self.handlers = BotHandlers(self.bot, self.db)
-
-        # Setup graceful shutdown
-        self.setup_signal_handlers()
-
-        logger.info("🤖 ChatAudit Bot initialized successfully")
-
-    def setup_signal_handlers(self):
-        """Setup graceful shutdown handlers"""
-        def signal_handler(signum, frame):
-            logger.info(f"📞 Received signal {signum}, shutting down gracefully...")
-            self.shutdown()
-            sys.exit(0)
-
-        signal.signal(signal.SIGTERM, signal_handler)
-        signal.signal(signal.SIGINT, signal_handler)
-
-    def shutdown(self):
-        """Graceful shutdown"""
-        try:
-            logger.info("⏹️ Stopping scheduler...")
-            self.handlers.scheduler.stop()
-
-            logger.info("🧹 Cleaning up database...")
-            self.db.cleanup_completed_tasks(days_old=7)
-
-            logger.info("✅ Shutdown completed")
-        except Exception as e:
-            logger.error(f"❌ Error during shutdown: {e}")
-
-    def run(self):
-        """Start the bot with error recovery"""
-        logger.info("🚀 Starting ChatAudit Bot...")
-
-        # Add owner to whitelist if not already
-        if BOT_OWNER_ID:
-            self.db.whitelist_user(BOT_OWNER_ID, True)
-            logger.info(f"👑 Owner {BOT_OWNER_ID} added to whitelist")
-
-        # Send startup notification to owner
-        try:
-            self.bot.send_message(
-                BOT_OWNER_ID,
-                f"🤖 **ChatAudit Bot Started!**\n\n"
-                f"**Time:** {datetime.now(IST).strftime('%d/%m/%Y %H:%M:%S IST')}\n"
-                f"**Status:** ✅ Online\n"
-                f"**Features:** All systems operational\n\n"
-                f"Bot is ready to manage your channels! 🎯\n\n"
-                f"**💡 Quick Start:** Use /help for complete guide"
-            )
-        except Exception as e:
-            logger.warning(f"⚠️ Could not send startup notification: {e}")
-
-        # Start bot with automatic restart on errors
-        retry_count = 0
-        max_retries = 5
-
-        while retry_count < max_retries:
-            try:
-                logger.info("🔄 Starting bot polling...")
-                self.bot.infinity_polling(
-                    timeout=30,
-                    long_polling_timeout=10,
-                    none_stop=True,
-                    interval=2
-                )
-
-            except KeyboardInterrupt:
-                logger.info("⌨️ Bot stopped by user")
-                break
-
-            except Exception as e:
-                retry_count += 1
-                logger.error(f"❌ Bot error (attempt {retry_count}/{max_retries}): {e}")
-
-                if retry_count < max_retries:
-                    wait_time = min(60 * retry_count, 300)  # Max 5 minutes
-                    logger.info(f"⏳ Restarting in {wait_time} seconds...")
-                    time.sleep(wait_time)
-                else:
-                    logger.error("💥 Max retries reached, shutting down")
-                    break
-
-        self.shutdown()
-
 def main():
-    """Main function"""
+    """Main function to start the bot"""
+    print(f"🤖 Starting {BOT_NAME}...")
+    print(f"⏰ Time: {datetime.now(IST).strftime('%d/%m/%Y %H:%M:%S IST')}")
+    
+    # Initialize database
+    db = DatabaseManager()
+    print("✅ Database initialized")
+    
+    # Add owner to whitelist
+    db.add_user_to_whitelist(BOT_OWNER_ID, "Owner", "Bot Owner")
+    print(f"👑 Owner {BOT_OWNER_ID} added to whitelist")
+    
+    # Initialize bot handlers
+    bot_handlers = BotHandlers(db)
+    bot = bot_handlers.bot
+    
+    print(f"🤖 Bot: @{bot.get_me().username}")
+    print("✅ Bot handlers initialized")
+    
+    # Send startup notification to owner
     try:
-        # Environment check
-        logger.info("🔍 Checking environment...")
+        startup_message = f"""🤖 **{BOT_NAME} Started Successfully!**
 
-        required_vars = ['BOT_TOKEN', 'BOT_OWNER_ID']
-        missing_vars = [var for var in required_vars if not os.getenv(var)]
+⏰ **Time:** {datetime.now(IST).strftime('%d/%m/%Y %H:%M:%S IST')}
+🟢 **Status:** Online and Ready
+👑 **Owner:** {BOT_OWNER_ID}
+🌐 **Dashboard:** Available
 
-        if missing_vars:
-            logger.error(f"❌ Missing environment variables: {', '.join(missing_vars)}")
-            logger.error("💡 Set these variables in Railway dashboard or .env file")
-            sys.exit(1)
+The bot is now ready to use! Send /start to begin."""
 
-        # Initialize and run bot
-        bot = ChatAuditBot()
-        bot.run()
-
+        bot.send_message(BOT_OWNER_ID, startup_message, parse_mode='Markdown')
+        print(f"📨 Startup notification sent to {BOT_OWNER_ID}")
     except Exception as e:
-        logger.error(f"💥 Critical error: {e}")
-        sys.exit(1)
+        print(f"⚠️ Could not send startup notification: {e}")
+    
+    print("🚀 Starting bot polling...")
+    
+    # Start bot polling
+    try:
+        bot.infinity_polling(none_stop=True, interval=2, timeout=20)
+    except KeyboardInterrupt:
+        print(f"\n🛑 {BOT_NAME} stopped by user")
+    except Exception as e:
+        print(f"❌ Bot polling error: {e}")
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
