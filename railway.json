@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "python main.py & python -m flask --app webapp run --host=0.0.0.0 --port=$PORT",
+    "startCommand": "gunicorn main:app --workers 2 --bind 0.0.0.0:$PORT --timeout 60",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
