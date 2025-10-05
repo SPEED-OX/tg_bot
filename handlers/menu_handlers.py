@@ -1,6 +1,5 @@
 """
-menu_handlers.py - CORRECTED IMPORTS for flat directory structure  
-Replace the import section at the top of your menu_handlers.py with this:
+Menu handlers for Controller Bot - Corrected Imports
 """
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
@@ -8,140 +7,154 @@ from datetime import datetime
 import json
 import logging
 from typing import Dict, Optional, List
-
-# Corrected imports for flat structure
-from models import DatabaseManager
-from time_parser import parse_time_input, format_time_display, TIME_FORMAT_HELP
+from database.models import DatabaseManager
+from utils.time_parser import parse_time_input, format_time_display, TIME_FORMAT_HELP
 from config import BOT_OWNER_ID, WEBAPP_URL, IST
-
-# Rest of your menu_handlers.py code remains the same...
 
 logger = logging.getLogger(__name__)
 
-class MenuState:
-    """Track user menu state and temporary data"""
+class UserState:
     def __init__(self):
         self.current_menu = "main"
+        self.awaiting_input = None
         self.selected_channel = None
-        self.post_content = {
-            'text': '',
-            'media_type': None,
-            'media_file_id': None,
-            'buttons': []
-        }
-        self.awaiting_input = None  # What input we're waiting for
+        self.post_content = {'text': '', 'media_type': None, 'media_file_id': None, 'buttons': []}
+        self.temp_data = {}
 
 class MenuHandler:
     def __init__(self, bot: telebot.TeleBot, db: DatabaseManager):
         self.bot = bot
         self.db = db
-        self.user_states: Dict[int, MenuState] = {}  # In-memory state storage
+        self.user_states: Dict[int, UserState] = {}
 
-    def get_user_state(self, user_id: int) -> MenuState:
-        """Get or create user state"""
+    def get_user_state(self, user_id: int) -> UserState:
         if user_id not in self.user_states:
-            self.user_states[user_id] = MenuState()
+            self.user_states[user_id] = UserState()
         return self.user_states[user_id]
 
     def is_authorized(self, user_id: int) -> bool:
-        """Check if user is authorized"""
         return user_id == BOT_OWNER_ID or self.db.is_user_whitelisted(user_id)
 
-    def show_main_menu(self, chat_id: int, user_id: int, message_id: int = None):
-        """Show main inline keyboard menu"""
+    def show_main_menu(self, chat_id: int, user_id: int):
         if not self.is_authorized(user_id):
-            text = """
-🚫 **Access Denied**
-
-You are not authorized to use this bot.
-Contact the bot owner for access.
-
-Use /help for more information.
-            """
-            if message_id:
-                self.bot.edit_message_text(text, chat_id, message_id, parse_mode='Markdown')
-            else:
-                self.bot.send_message(chat_id, text, parse_mode='Markdown')
+            self.bot.send_message(chat_id, "❌ You're not authorized to use this bot.")
             return
 
         keyboard = InlineKeyboardMarkup(row_width=1)
         keyboard.add(InlineKeyboardButton("🏠 Start", callback_data="menu_start"))
-        keyboard.add(InlineKeyboardButton("👥 User Management", callback_data="menu_users"))
+
+        if user_id == BOT_OWNER_ID:
+            keyboard.add(InlineKeyboardButton("👥 User Management", callback_data="menu_user_mgmt"))
+
         keyboard.add(InlineKeyboardButton("📝 New Post", callback_data="menu_new_post"))
         keyboard.add(InlineKeyboardButton("📅 Schedules", callback_data="menu_schedules"))
-        keyboard.add(InlineKeyboardButton("📊 Dashboard", web_app=WebAppInfo(url=f"{WEBAPP_URL}/dashboard")))
 
-        text = """
-🤖 **Controller Bot - Main Menu**
+        if WEBAPP_URL and WEBAPP_URL != 'https://your-railway-app.railway.app':
+            web_app = WebAppInfo(url=f"{WEBAPP_URL}/dashboard")
+            keyboard.add(InlineKeyboardButton("📊 Dashboard", web_app=web_app))
 
-Select an option below:
+        text = """🤖 **Controller Bot - Main Menu**
 
-🏠 **Start** - Welcome message
-👥 **User Management** - Manage whitelist  
-📝 **New Post** - Create and send posts
-📅 **Schedules** - View and manage scheduled tasks
-📊 **Dashboard** - Web interface
+Welcome to your advanced channel management bot!
 
-💡 **Available Commands:**
-• /help - Show help
-• /addchannel - Add a channel
-• /channels - View your channels
-        """
+**🎯 Quick Actions:**
+• **New Post** - Create and schedule posts
+• **Schedules** - Manage upcoming posts
+• **Dashboard** - Web interface for advanced features
 
-        if message_id:
-            self.bot.edit_message_text(text, chat_id, message_id, parse_mode='Markdown', reply_markup=keyboard)
-        else:
-            self.bot.send_message(chat_id, text, parse_mode='Markdown', reply_markup=keyboard)
-
-    def handle_callback_query(self, call):
-        """Handle all callback queries for menu system"""
-        user_id = call.from_user.id
-        data = call.data
-        chat_id = call.message.chat.id
-        message_id = call.message.message_id
+**💡 Need help?** Use /help for complete guide"""
 
         try:
-            if data == "menu_main":
-                self.show_main_menu(chat_id, user_id, message_id)
-            elif data == "menu_start":
-                self.handle_start_callback(chat_id, user_id, message_id)
-            # More handlers would be added here
-
-            self.bot.answer_callback_query(call.id)
-
+            self.bot.send_message(chat_id, text, parse_mode='Markdown', reply_markup=keyboard)
         except Exception as e:
-            logger.error(f"Callback error: {e}")
-            self.bot.answer_callback_query(call.id, text="❌ Error occurred", show_alert=True)
+            logger.error(f"Error showing main menu: {e}")
+            self.bot.send_message(chat_id, "❌ Error showing main menu. Please try /start again.")
 
-    def handle_start_callback(self, chat_id: int, user_id: int, message_id: int):
-        """Handle start button callback"""
-        keyboard = InlineKeyboardMarkup()
-        keyboard.add(InlineKeyboardButton("⬅️ Back to Menu", callback_data="menu_main"))
+        state = self.get_user_state(user_id)
+        state.current_menu = "main"
+        state.awaiting_input = None
 
-        text = """
-🤖 **Welcome to Controller Bot!**
+    def handle_callback_query(self, call):
+        user_id = call.from_user.id
+        chat_id = call.message.chat.id
+        data = call.data
 
-I am your advanced Telegram channel management assistant.
+        if not self.is_authorized(user_id):
+            self.bot.answer_callback_query(call.id, "❌ Not authorized", show_alert=True)
+            return
 
-**✨ What I can do:**
-• 📝 Create rich posts with media and buttons
-• ⏰ Schedule posts for future publishing  
-• 💣 Set self-destruct timers for messages
-• 👥 Manage user permissions
-• 📊 Web dashboard for advanced features
+        try:
+            if data == "menu_start":
+                self.show_start_info(chat_id, call.id)
+            elif data == "menu_user_mgmt":
+                self.show_user_management_menu(chat_id, user_id, call.id)
+            elif data == "menu_new_post":
+                self.show_channel_selection(chat_id, user_id, call.id)
+            elif data == "menu_schedules":
+                self.show_schedules_menu(chat_id, user_id, call.id)
+            elif data == "back_to_main":
+                self.show_main_menu(chat_id, user_id)
+                self.bot.answer_callback_query(call.id)
+        except Exception as e:
+            logger.error(f"Error handling callback query {data}: {e}")
+            self.bot.answer_callback_query(call.id, "❌ Error processing request", show_alert=True)
 
-**📋 Quick Commands:**
-• /help - Detailed help
-• /addchannel - Add a channel to manage
-• /channels - View your channels
+    def show_start_info(self, chat_id: int, callback_query_id: str):
+        text = """🏠 **Getting Started**
 
-**🚀 Getting Started:**
+**📋 Setup Steps:**
 1. Add me as admin to your channel
-2. Use /addchannel to register the channel
-3. Return to menu and select "New Post"
-4. Create amazing content!
+2. Use `/addchannel @yourchannel`
+3. Create posts using **New Post**
 
-Ready to manage your channels like a pro? 🎯
-        """
+Ready to manage your channels! 🚀"""
 
-        self.bot.edit_message_text(text, chat_id, message_id, parse_mode='Markdown', reply_markup=keyboard)
+        keyboard = InlineKeyboardMarkup()
+        keyboard.add(InlineKeyboardButton("⬅️ Back", callback_data="back_to_main"))
+
+        try:
+            self.bot.edit_message_text(text, chat_id, reply_markup=keyboard, parse_mode='Markdown')
+        except:
+            self.bot.send_message(chat_id, text, parse_mode='Markdown', reply_markup=keyboard)
+
+        self.bot.answer_callback_query(callback_query_id)
+
+    def show_user_management_menu(self, chat_id: int, user_id: int, callback_query_id: str):
+        if user_id != BOT_OWNER_ID:
+            self.bot.answer_callback_query(callback_query_id, "❌ Owner access only", show_alert=True)
+            return
+
+        text = "👥 **User Management** - Coming soon!"
+        keyboard = InlineKeyboardMarkup()
+        keyboard.add(InlineKeyboardButton("⬅️ Back", callback_data="back_to_main"))
+
+        try:
+            self.bot.edit_message_text(text, chat_id, reply_markup=keyboard)
+        except:
+            self.bot.send_message(chat_id, text, reply_markup=keyboard)
+
+        self.bot.answer_callback_query(callback_query_id)
+
+    def show_channel_selection(self, chat_id: int, user_id: int, callback_query_id: str):
+        text = "📝 **New Post** - Coming soon!"
+        keyboard = InlineKeyboardMarkup()
+        keyboard.add(InlineKeyboardButton("⬅️ Back", callback_data="back_to_main"))
+
+        try:
+            self.bot.edit_message_text(text, chat_id, reply_markup=keyboard)
+        except:
+            self.bot.send_message(chat_id, text, reply_markup=keyboard)
+
+        self.bot.answer_callback_query(callback_query_id)
+
+    def show_schedules_menu(self, chat_id: int, user_id: int, callback_query_id: str):
+        text = "📅 **Schedules** - Coming soon!"
+        keyboard = InlineKeyboardMarkup()
+        keyboard.add(InlineKeyboardButton("⬅️ Back", callback_data="back_to_main"))
+
+        try:
+            self.bot.edit_message_text(text, chat_id, reply_markup=keyboard)
+        except:
+            self.bot.send_message(chat_id, text, reply_markup=keyboard)
+
+        self.bot.answer_callback_query(callback_query_id)
