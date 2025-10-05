@@ -1,17 +1,19 @@
 """
-ChatAudit Bot - Bot Command Handlers with Updated Commands
+TechGeekZ Bot - Bot Command Handlers
+Complete command handling with custom messages and menu updates
 """
 import telebot
 from telebot import types
 from telebot.types import BotCommand
 import sys
 import os
+import requests
 from datetime import datetime
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config import BOT_TOKEN, BOT_OWNER_ID, BOT_NAME, IST, WEBAPP_URL
+from config import BOT_TOKEN, BOT_OWNER_ID, BOT_NAME, IST, WEBAPP_URL, format_start_time
 from handlers.menu_handlers import MenuHandler
 
 class BotHandlers:
@@ -21,29 +23,60 @@ class BotHandlers:
         self.menu_handler = MenuHandler(self.bot, self.db)
         self.user_states = {}
         
-        # Register handlers and update commands
+        # Register handlers and auto-update commands
         self.register_handlers()
         
+    def get_dashboard_status(self):
+        """Check if dashboard is online"""
+        try:
+            if not WEBAPP_URL:
+                return "Offline"
+            
+            response = requests.get(f"{WEBAPP_URL}/health", timeout=5)
+            return "Online" if response.status_code == 200 else "Offline"
+        except:
+            return "Offline"
+    
+    def get_user_details(self, user_id):
+        """Get user's Telegram details"""
+        try:
+            user_info = self.bot.get_chat(user_id)
+            username = f"@{user_info.username}" if user_info.username else "No username"
+            return username
+        except:
+            return "Unknown"
+    
+    def get_owner_username(self):
+        """Get owner's username"""
+        try:
+            owner_info = self.bot.get_chat(BOT_OWNER_ID)
+            return f"@{owner_info.username}" if owner_info.username else "Owner"
+        except:
+            return "Owner"
+
     def set_bot_commands(self):
-        """Set updated bot commands with proper descriptions"""
+        """Set bot commands - called automatically on deployment"""
         try:
             commands = [
-                BotCommand("start", "🏠 Open main menu with inline keyboards"),
-                BotCommand("help", "📖 Complete help guide with all features"),
-                BotCommand("addchannel", "📺 Add a channel to manage (e.g., /addchannel @mychannel)"),
-                BotCommand("channels", "📋 View your added channels list"),
+                BotCommand("start", "start the bot"),
+                BotCommand("user", "user settings"),
+                BotCommand("newpost", "create posts"),
+                BotCommand("schedules", "schedule settings"),
+                BotCommand("dashboard", "web dashboard"),
             ]
             
             self.bot.set_my_commands(commands)
-            print("✅ Bot commands updated successfully")
+            print("✅ Bot commands updated automatically on deployment")
+            return True
             
         except Exception as e:
             print(f"⚠️ Failed to update bot commands: {e}")
+            return False
     
     def register_handlers(self):
         """Register all bot command handlers"""
         
-        # Update bot commands first
+        # AUTO-UPDATE COMMANDS ON STARTUP
         self.set_bot_commands()
         
         @self.bot.message_handler(commands=['start'])
@@ -55,176 +88,154 @@ class BotHandlers:
             # Check if user is authorized
             if not self.db.is_user_whitelisted(user_id):
                 self.bot.reply_to(message, 
-                    "❌ You are not authorized to use this bot. Contact the administrator.")
+                    "You are not authorized to use this bot. Contact the administrator.")
                 return
             
             # Update user info in database
             self.db.add_user_to_whitelist(user_id, username, first_name)
             
-            # Send welcome message with main menu
-            welcome_text = f"""🤖 **Welcome to {BOT_NAME}**
+            # Get user details and status
+            user_username = f"@{username}" if username else "User"
+            owner_username = self.get_owner_username()
+            dashboard_status = self.get_dashboard_status()
+            current_time = format_start_time()
+            
+            # Custom start message
+            start_message = f"""Welcome to {BOT_NAME}
 
-Hello {first_name}! You are authorized to use this bot.
+Hello {user_username}! What new are we thinking today..
 
-**Available Features:**
-• **Inline Keyboards** - Quick navigation menus
-• **User Management** - Whitelist control (owner)
-• **Channel Management** - Add and manage channels
-• **Post Scheduling** - Schedule posts with IST timezone
-• **Web Dashboard** - Advanced management interface
+Owner: {owner_username}
+Dashboard: {dashboard_status}
+Time: {current_time}
 
-**Current Time (IST):** {datetime.now(IST).strftime('%d/%m %H:%M')}
+Bot is active. Send /help for all commands"""
 
-Use the buttons below to navigate:"""
-
-            self.menu_handler.show_main_menu(message.chat.id, welcome_text)
+            # Send custom message and show main menu
+            self.bot.send_message(message.chat.id, start_message)
+            self.menu_handler.show_main_menu(message.chat.id)
 
         @self.bot.message_handler(commands=['help'])
         def handle_help(message):
             user_id = message.from_user.id
             
             if not self.db.is_user_whitelisted(user_id):
-                self.bot.reply_to(message, "❌ You are not authorized to use this bot.")
+                self.bot.reply_to(message, "You are not authorized to use this bot.")
                 return
             
-            help_text = f"""📖 **{BOT_NAME} - Complete Guide**
+            help_text = f"""{BOT_NAME} - Available Commands
 
-**🎛️ Menu System:**
-• **Inline Keyboards** - Floating buttons above messages
-• **Button Menus** - Keyboard replacement menus
-• **Mixed Navigation** - Both types for different functions
+/start - start the bot
+/user - user settings  
+/newpost - create posts
+/schedules - schedule settings
+/dashboard - web dashboard
+/permit <userid> - add user to whitelist
+/remove <userid> - remove user from whitelist
 
-**🏠 Main Menu (Inline Keyboard):**
-• **🏠 Start** - Getting started guide and welcome
-• **👥 User** - User management menu (owner only)
-• **📝 New Post** - Channel selection and post creation
-• **📅 Schedules** - View and manage scheduled tasks
-• **📊 Dashboard** - Open web interface
+Use the menu buttons or type commands manually."""
 
-**👥 User Management (Button Menu - Owner Only):**
-• **👥 Users** - List all whitelisted users with details
-• **➕ Permit <user_id>** - Add user to whitelist
-• **➖ Remove <user_id>** - Remove user from whitelist
-• **⬅️ Back** - Return to main menu
+            self.bot.send_message(message.chat.id, help_text)
 
-**📝 Post Creation Flow:**
-1. Select **New Post** → Choose from your channels
-2. Send content (text, media, buttons)
-3. Choose posting option (now, schedule, self-destruct)
-
-**📅 Schedule Management (Button Menu):**
-• **📋 Scheduled Posts** - View upcoming posts
-• **💣 Self-Destruct Timings** - View auto-delete tasks
-• **❌ Cancel** - Cancel scheduled tasks
-• **⬅️ Back** - Return to main menu
-
-**📺 Channel Commands:**
-• `/addchannel @channelname` - Add channel to manage
-• `/channels` - View your added channels
-
-**🕐 Time Format:**
-• **dd/mm hh:mm** - Specific date (5/10 15:00 = Oct 5, 3:00 PM)
-• **hh:mm** - Same day (15:00 = 3:00 PM today)
-• All times in **IST (Indian Standard Time)**
-
-**📊 Web Dashboard:**
-Advanced management interface with statistics and controls.
-
-**💡 Navigation Tips:**
-• Use **inline buttons** for quick actions
-• Use **button menus** for detailed operations
-• **/start** always returns to main menu
-• **/help** shows this complete guide
-
-**Current Time (IST):** {datetime.now(IST).strftime('%d/%m/%Y %H:%M')}
-
-Ready to manage your channels! 🚀"""
-
-            self.bot.send_message(message.chat.id, help_text, parse_mode='Markdown')
-
-        @self.bot.message_handler(commands=['addchannel'])
-        def handle_add_channel(message):
+        @self.bot.message_handler(commands=['user'])
+        def handle_user_command(message):
             user_id = message.from_user.id
             
             if not self.db.is_user_whitelisted(user_id):
-                self.bot.reply_to(message, "❌ You are not authorized to use this bot.")
+                self.bot.reply_to(message, "You are not authorized to use this bot.")
+                return
+            
+            if user_id != BOT_OWNER_ID:
+                self.bot.reply_to(message, "User management is owner only.")
+                return
+            
+            self.menu_handler.show_user_menu(message.chat.id)
+
+        @self.bot.message_handler(commands=['newpost'])
+        def handle_newpost_command(message):
+            user_id = message.from_user.id
+            
+            if not self.db.is_user_whitelisted(user_id):
+                self.bot.reply_to(message, "You are not authorized to use this bot.")
+                return
+            
+            self.menu_handler.show_newpost_menu(message.chat.id)
+
+        @self.bot.message_handler(commands=['schedules'])
+        def handle_schedules_command(message):
+            user_id = message.from_user.id
+            
+            if not self.db.is_user_whitelisted(user_id):
+                self.bot.reply_to(message, "You are not authorized to use this bot.")
+                return
+            
+            self.menu_handler.show_schedules_menu(message.chat.id)
+
+        @self.bot.message_handler(commands=['dashboard'])
+        def handle_dashboard_command(message):
+            user_id = message.from_user.id
+            
+            if not self.db.is_user_whitelisted(user_id):
+                self.bot.reply_to(message, "You are not authorized to use this bot.")
+                return
+            
+            if WEBAPP_URL and WEBAPP_URL.startswith('https://'):
+                dashboard_url = f"{WEBAPP_URL}/dashboard"
+                keyboard = types.InlineKeyboardMarkup()
+                keyboard.add(types.InlineKeyboardButton("Open Dashboard", web_app=types.WebApp(dashboard_url)))
+                self.bot.send_message(message.chat.id, "Dashboard", reply_markup=keyboard)
+            else:
+                self.bot.reply_to(message, "Dashboard is not available.")
+
+        @self.bot.message_handler(commands=['permit'])
+        def handle_permit_command(message):
+            if message.from_user.id != BOT_OWNER_ID:
+                self.bot.reply_to(message, "Owner only command.")
                 return
             
             try:
                 args = message.text.split()
                 if len(args) != 2:
-                    help_text = """📺 **Add Channel - Help**
-
-**Usage:** `/addchannel @channelname`
-
-**Examples:**
-• `/addchannel @mynewschannel`
-• `/addchannel @techupdate`
-
-**Steps:**
-1. Add me as admin to your channel
-2. Give me these permissions:
-   ✅ Post messages
-   ✅ Edit messages
-   ✅ Delete messages
-3. Use the command above
-
-**Note:** Channel username must start with @"""
-                    
-                    self.bot.send_message(message.chat.id, help_text, parse_mode='Markdown')
+                    self.bot.reply_to(message, "Usage: /permit <user_id>\nExample: /permit 123456789")
                     return
                 
-                channel_username = args[1].replace('@', '')
-                channel_id = hash(channel_username) % 1000000
+                user_id_str = args[1].replace('-', '')
+                user_id = int(user_id_str)
                 
-                self.db.add_channel(channel_id, f"@{channel_username}", channel_username, user_id)
-                self.bot.reply_to(message, 
-                    f"✅ Channel @{channel_username} added successfully!\n\n"
-                    f"You can now create posts for this channel using /start → New Post.")
+                self.db.add_user_to_whitelist(user_id)
+                self.bot.reply_to(message, f"User {user_id} added to whitelist!")
                 
+            except ValueError:
+                self.bot.reply_to(message, "Invalid user ID. Please provide a numeric user ID.")
             except Exception as e:
-                self.bot.reply_to(message, f"❌ Error adding channel: {str(e)}")
+                self.bot.reply_to(message, f"Error: {str(e)}")
 
-        @self.bot.message_handler(commands=['channels'])
-        def handle_list_channels(message):
-            user_id = message.from_user.id
-            
-            if not self.db.is_user_whitelisted(user_id):
-                self.bot.reply_to(message, "❌ You are not authorized to use this bot.")
+        @self.bot.message_handler(commands=['remove'])
+        def handle_remove_command(message):
+            if message.from_user.id != BOT_OWNER_ID:
+                self.bot.reply_to(message, "Owner only command.")
                 return
             
-            channels = self.db.get_user_channels(user_id)
-            
-            if not channels:
-                text = """📺 **Your Channels**
-
-📭 You haven't added any channels yet.
-
-**To add a channel:**
-1. Add me as admin to your channel
-2. Use: `/addchannel @yourchannel`
-
-**Example:**
-`/addchannel @mynewschannel`"""
-            else:
-                text = "📺 **Your Channels:**\n\n"
-                for i, channel in enumerate(channels, 1):
-                    channel_name = channel['name'] or 'Unknown'
-                    text += f"{i}. **{channel_name}**\n"
-                    text += f"   Username: {channel['username']}\n"
-                    text += f"   Added: {channel['added_date'][:10]}\n\n"
-                text += "💡 Use /start → New Post to create content for these channels."
-            
-            self.bot.send_message(message.chat.id, text, parse_mode='Markdown')
-
-        # Temporary command to force update (remove after testing)
-        @self.bot.message_handler(commands=['updatecommands'])
-        def update_commands_manually(message):
-            if message.from_user.id == BOT_OWNER_ID:
-                self.set_bot_commands()
-                self.bot.reply_to(message, "✅ Bot commands updated manually!")
-            else:
-                self.bot.reply_to(message, "❌ Owner only command")
+            try:
+                args = message.text.split()
+                if len(args) != 2:
+                    self.bot.reply_to(message, "Usage: /remove <user_id>\nExample: /remove 123456789")
+                    return
+                
+                user_id_str = args[1].replace('-', '')
+                user_id = int(user_id_str)
+                
+                if user_id == BOT_OWNER_ID:
+                    self.bot.reply_to(message, "Cannot remove bot owner from whitelist!")
+                    return
+                
+                self.db.remove_user_from_whitelist(user_id)
+                self.bot.reply_to(message, f"User {user_id} removed from whitelist!")
+                
+            except ValueError:
+                self.bot.reply_to(message, "Invalid user ID. Please provide a numeric user ID.")
+            except Exception as e:
+                self.bot.reply_to(message, f"Error: {str(e)}")
 
         # Register callback query handler
         @self.bot.callback_query_handler(func=lambda call: True)
