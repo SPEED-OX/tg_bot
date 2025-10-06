@@ -68,13 +68,28 @@ def start_webapp():
     except Exception as e:
         print(f"❌ Webapp error: {e}")
 
+def clear_old_commands():
+    """Clear old commands before starting"""
+    try:
+        import telebot
+        temp_bot = telebot.TeleBot(BOT_TOKEN)
+        temp_bot.delete_my_commands()
+        print("🗑️ Cleared old commands before startup")
+    except:
+        print("⚠️ Could not clear old commands")
+
+# Add this before starting bot in main.py
 if __name__ == '__main__':
     if not BOT_TOKEN or not BOT_OWNER_ID:
         print("❌ Missing BOT_TOKEN or BOT_OWNER_ID")
         exit(1)
     
-    print(f"🚀 Starting {BOT_NAME} services...")
+    # Clear old commands first
+    clear_old_commands()
     
+    print(f"🚀 Starting {BOT_NAME} services...")
+    # ... rest of your code
+
     # Start bot in background thread
     bot_thread = threading.Thread(target=start_bot, daemon=True)
     bot_thread.start()
