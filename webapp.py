@@ -1,6 +1,6 @@
 """
 TechGeekZ Bot - Combined Bot + Web Dashboard
-Fixed version with proper error handling and command updates
+DIRECT WEBAPP VERSION - /dashboard opens webapp immediately with minimal UI
 """
 from flask import Flask, render_template, jsonify
 import os
@@ -10,7 +10,7 @@ import time
 import requests
 import telebot
 from telebot import types
-from telebot.types import BotCommand
+from telebot.types import BotCommand, WebApp
 from datetime import datetime, timezone, timedelta
 
 # Add current directory to path
@@ -32,34 +32,60 @@ class SimpleBotHandler:
     def __init__(self, database_manager):
         self.db = database_manager
         self.bot = telebot.TeleBot(BOT_TOKEN, threaded=True)
+        self.user_states = {}
         
-        # IMPORTANT: Update commands immediately on initialization
-        self.set_bot_commands()
+        # Register handlers first
         self.register_handlers()
         
-    def set_bot_commands(self):
-        """Set bot commands - FIXED VERSION"""
-        try:
-            commands = [
-                BotCommand("start", "start the bot"),
-                BotCommand("user", "user settings"),
-                BotCommand("newpost", "create posts"),
-                BotCommand("schedules", "schedule settings"),
-                BotCommand("dashboard", "web dashboard"),
-                BotCommand("permit", "add user to whitelist"),
-                BotCommand("remove", "remove user from whitelist"),
-            ]
-            
-            self.bot.set_my_commands(commands)
-            print("✅ Bot commands updated successfully")
-            return True
-            
-        except Exception as e:
-            print(f"❌ Failed to update bot commands: {e}")
-            return False
+        # FORCE UPDATE COMMANDS
+        self.force_update_commands()
+        
+    def force_update_commands(self):
+        """Force update bot commands with multiple attempts"""
+        max_attempts = 3
+        
+        for attempt in range(max_attempts):
+            try:
+                print(f"🔄 Attempt {attempt + 1} to update bot commands...")
+                
+                # Delete old commands first
+                try:
+                    self.bot.delete_my_commands()
+                    print("🗑️ Old commands deleted")
+                    time.sleep(2)
+                except:
+                    print("⚠️ Could not delete old commands")
+                
+                # Set new commands
+                commands = [
+                    BotCommand("start", "start the bot"),
+                    BotCommand("user", "user settings"),
+                    BotCommand("newpost", "create posts"),
+                    BotCommand("schedules", "schedule settings"),
+                    BotCommand("dashboard", "web dashboard"),
+                    BotCommand("permit", "add user to whitelist"),
+                    BotCommand("remove", "remove user from whitelist"),
+                ]
+                
+                self.bot.set_my_commands(commands)
+                print("✅ Bot commands updated successfully!")
+                
+                # Verify commands
+                time.sleep(1)
+                current_commands = self.bot.get_my_commands()
+                print(f"📋 Verified {len(current_commands)} commands active")
+                
+                return True
+                
+            except Exception as e:
+                print(f"❌ Attempt {attempt + 1} failed: {e}")
+                if attempt < max_attempts - 1:
+                    time.sleep(3)
+                else:
+                    print("❌ All attempts to update commands failed")
+                    return False
     
     def get_dashboard_status(self):
-        """Check dashboard status"""
         try:
             if not WEBAPP_URL:
                 return "Offline"
@@ -69,7 +95,6 @@ class SimpleBotHandler:
             return "Offline"
     
     def get_owner_username(self):
-        """Get owner username"""
         try:
             owner_info = self.bot.get_chat(BOT_OWNER_ID)
             return f"@{owner_info.username}" if owner_info.username else f"Owner{BOT_OWNER_ID}"
@@ -104,7 +129,6 @@ Time: {current_time}
 
 Bot is active. Send /help for all commands"""
 
-            # Send message and show main menu
             self.bot.send_message(message.chat.id, start_message)
             self.show_main_menu(message.chat.id)
         
@@ -130,7 +154,7 @@ Use menu buttons or type commands manually."""
         
         @self.bot.message_handler(commands=['dashboard'])
         def handle_dashboard(message):
-            """FIXED DASHBOARD COMMAND"""
+            """DIRECT WEBAPP OPENING - No extra text, just WebApp button"""
             if not self.db.is_user_whitelisted(message.from_user.id):
                 self.bot.reply_to(message, "You are not authorized to use this bot.")
                 return
@@ -138,22 +162,23 @@ Use menu buttons or type commands manually."""
             if WEBAPP_URL and WEBAPP_URL.startswith('https://'):
                 dashboard_url = f"{WEBAPP_URL}/dashboard"
                 
-                # Try WebApp button first
                 try:
+                    # DIRECT WEBAPP BUTTON - Opens immediately in Telegram
                     keyboard = types.InlineKeyboardMarkup()
                     keyboard.add(types.InlineKeyboardButton(
-                        "Open Dashboard", 
-                        web_app=types.WebApp(dashboard_url)
+                        "Dashboard", 
+                        web_app=WebApp(url=dashboard_url)
                     ))
-                    self.bot.send_message(message.chat.id, "Dashboard:", reply_markup=keyboard)
+                    
+                    # Send ONLY the button, no extra text - most direct possible
+                    self.bot.send_message(message.chat.id, ".", reply_markup=keyboard)
+                    
                 except Exception as e:
-                    # Fallback to URL button if WebApp fails
-                    print(f"WebApp failed, using URL button: {e}")
-                    keyboard = types.InlineKeyboardMarkup()
-                    keyboard.add(types.InlineKeyboardButton("Open Dashboard", url=dashboard_url))
-                    self.bot.send_message(message.chat.id, "Dashboard:", reply_markup=keyboard)
+                    print(f"WebApp failed: {e}")
+                    # Fallback to direct URL
+                    self.bot.send_message(message.chat.id, f"{dashboard_url}")
             else:
-                self.bot.reply_to(message, "Dashboard URL not configured.")
+                self.bot.reply_to(message, "Dashboard not available.")
         
         @self.bot.message_handler(commands=['user'])
         def handle_user(message):
@@ -163,7 +188,27 @@ Use menu buttons or type commands manually."""
             if message.from_user.id != BOT_OWNER_ID:
                 self.bot.reply_to(message, "User management is owner only.")
                 return
+            
+            self.hide_keyboard(message.chat.id)
             self.show_user_menu(message.chat.id)
+        
+        @self.bot.message_handler(commands=['newpost'])
+        def handle_newpost(message):
+            if not self.db.is_user_whitelisted(message.from_user.id):
+                self.bot.reply_to(message, "Unauthorized")
+                return
+            
+            self.hide_keyboard(message.chat.id)
+            self.show_newpost_menu(message.chat.id)
+        
+        @self.bot.message_handler(commands=['schedules'])
+        def handle_schedules(message):
+            if not self.db.is_user_whitelisted(message.from_user.id):
+                self.bot.reply_to(message, "Unauthorized")
+                return
+            
+            self.hide_keyboard(message.chat.id)
+            self.show_schedules_menu(message.chat.id)
         
         @self.bot.message_handler(commands=['permit'])
         def handle_permit(message):
@@ -204,22 +249,93 @@ Use menu buttons or type commands manually."""
             except:
                 self.bot.reply_to(message, "Invalid user ID format.")
         
-        # Simple menu handlers
+        # Callback handler for inline keyboards
+        @self.bot.callback_query_handler(func=lambda call: True)
+        def handle_callback(call):
+            if not self.db.is_user_whitelisted(call.from_user.id):
+                self.bot.answer_callback_query(call.id, "Not authorized")
+                return
+            
+            data = call.data
+            chat_id = call.message.chat.id
+            
+            if data == "start":
+                self.show_main_menu(chat_id, "Welcome back to main menu!")
+            elif data == "user" and call.from_user.id == BOT_OWNER_ID:
+                self.show_user_menu(chat_id)
+            elif data == "newpost":
+                self.show_newpost_menu(chat_id)
+            elif data == "schedules":
+                self.show_schedules_menu(chat_id)
+            
+            self.bot.answer_callback_query(call.id)
+        
+        # Message handler for button menus
         @self.bot.message_handler(func=lambda message: True)
         def handle_all_messages(message):
             if not self.db.is_user_whitelisted(message.from_user.id):
                 return
             
             text = message.text.strip() if message.text else ""
+            chat_id = message.chat.id
+            user_id = message.from_user.id
             
-            # Handle basic menu responses
+            # Handle button menu responses
             if text == "back":
-                self.hide_keyboard(message.chat.id)
-                self.show_main_menu(message.chat.id)
-            elif text == "users" and message.from_user.id == BOT_OWNER_ID:
-                self.list_users(message.chat.id)
+                self.hide_keyboard(chat_id)
+                self.show_main_menu(chat_id, "Returned to main menu")
+            
+            elif text == "users" and user_id == BOT_OWNER_ID:
+                self.list_users(chat_id)
+            
+            elif text == "permit" and user_id == BOT_OWNER_ID:
+                self.bot.send_message(chat_id, "Enter user ID to permit:\nFormat: permit <user_id>\nExample: permit 123456789")
+            
+            elif text == "remove" and user_id == BOT_OWNER_ID:
+                self.bot.send_message(chat_id, "Enter user ID to remove:\nFormat: remove <user_id>\nExample: remove 123456789")
+            
+            elif text.startswith("permit ") and user_id == BOT_OWNER_ID:
+                parts = text.split()
+                if len(parts) == 2:
+                    try:
+                        target_user_id = int(parts[1].replace('-', ''))
+                        self.db.add_user_to_whitelist(target_user_id)
+                        self.bot.send_message(chat_id, f"User {target_user_id} added to whitelist!")
+                    except:
+                        self.bot.send_message(chat_id, "Invalid user ID format!")
+            
+            elif text.startswith("remove ") and user_id == BOT_OWNER_ID:
+                parts = text.split()
+                if len(parts) == 2:
+                    try:
+                        target_user_id = int(parts[1].replace('-', ''))
+                        if target_user_id != BOT_OWNER_ID:
+                            self.db.remove_user_from_whitelist(target_user_id)
+                            self.bot.send_message(chat_id, f"User {target_user_id} removed from whitelist!")
+                        else:
+                            self.bot.send_message(chat_id, "Cannot remove bot owner!")
+                    except:
+                        self.bot.send_message(chat_id, "Invalid user ID format!")
+            
+            # Handle newpost menu
+            elif text == "send":
+                self.bot.send_message(chat_id, "Send options will be available soon!")
+            elif text == "cancel":
+                self.bot.send_message(chat_id, "Task cancelled!")
+                self.hide_keyboard(chat_id)
+            elif text == "preview":
+                self.bot.send_message(chat_id, "Post preview will be available soon!")
+            elif text == "delete all":
+                self.bot.send_message(chat_id, "Draft deleted!")
+                self.hide_keyboard(chat_id)
+            
+            # Handle schedules menu
+            elif text == "scheduled posts":
+                self.bot.send_message(chat_id, "No scheduled posts found.")
+            elif text == "self-destruct timings":
+                self.bot.send_message(chat_id, "No self-destruct posts found.")
     
-    def show_main_menu(self, chat_id):
+    def show_main_menu(self, chat_id, text="Main Menu"):
         """Show main inline keyboard menu"""
         keyboard = types.InlineKeyboardMarkup()
         keyboard.row(types.InlineKeyboardButton("start", callback_data="start"))
@@ -230,15 +346,15 @@ Use menu buttons or type commands manually."""
         keyboard.row(types.InlineKeyboardButton("newpost", callback_data="newpost"))
         keyboard.row(types.InlineKeyboardButton("schedules", callback_data="schedules"))
         
-        # Dashboard button
+        # Dashboard button in main menu - DIRECT WEBAPP
         if WEBAPP_URL and WEBAPP_URL.startswith('https://'):
             dashboard_url = f"{WEBAPP_URL}/dashboard"
             try:
-                keyboard.row(types.InlineKeyboardButton("dashboard", web_app=types.WebApp(dashboard_url)))
+                keyboard.row(types.InlineKeyboardButton("dashboard", web_app=WebApp(url=dashboard_url)))
             except:
                 keyboard.row(types.InlineKeyboardButton("dashboard", url=dashboard_url))
         
-        self.bot.send_message(chat_id, "Main Menu:", reply_markup=keyboard)
+        self.bot.send_message(chat_id, text, reply_markup=keyboard)
     
     def show_user_menu(self, chat_id):
         """Show user management button menu"""
@@ -247,11 +363,36 @@ Use menu buttons or type commands manually."""
         keyboard.row("remove", "back")
         
         self.bot.send_message(chat_id, "User Management:", reply_markup=keyboard)
+        self.user_states[chat_id] = "user_menu"
+    
+    def show_newpost_menu(self, chat_id):
+        """Show newpost button menu"""
+        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
+        keyboard.row("send", "cancel")
+        keyboard.row("preview", "delete all")
+        keyboard.row("back")
+        
+        self.bot.send_message(chat_id, "New Post:", reply_markup=keyboard)
+        self.user_states[chat_id] = "newpost_menu"
+    
+    def show_schedules_menu(self, chat_id):
+        """Show schedules button menu"""
+        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
+        keyboard.row("scheduled posts", "self-destruct timings")
+        keyboard.row("cancel", "back")
+        
+        self.bot.send_message(chat_id, "Schedules:", reply_markup=keyboard)
+        self.user_states[chat_id] = "schedules_menu"
     
     def hide_keyboard(self, chat_id):
         """Hide button keyboard"""
-        keyboard = types.ReplyKeyboardRemove()
-        self.bot.send_message(chat_id, "Menu hidden", reply_markup=keyboard)
+        try:
+            keyboard = types.ReplyKeyboardRemove()
+            self.bot.send_message(chat_id, "Menu hidden", reply_markup=keyboard)
+            if chat_id in self.user_states:
+                del self.user_states[chat_id]
+        except Exception as e:
+            print(f"❌ Failed to hide keyboard: {e}")
     
     def list_users(self, chat_id):
         """List all whitelisted users"""
@@ -307,14 +448,13 @@ def start_bot():
         db.add_user_to_whitelist(BOT_OWNER_ID, "Owner", "Bot Owner")
         print(f"👑 Owner {BOT_OWNER_ID} added to whitelist")
         
-        # Initialize simple bot handler
+        # Initialize bot handler
         bot_handler = SimpleBotHandler(db)
         bot_instance = bot_handler.bot
         
         print(f"🤖 Bot: @{bot_instance.get_me().username}")
-        print("✅ Bot commands updated")
         
-        # Wait a moment for Flask to be ready
+        # Wait for Flask
         time.sleep(2)
         
         # Send deployment notification
@@ -359,6 +499,11 @@ def get_users():
         return []
 
 # Flask routes
+@app.route('/favicon.ico')
+def favicon():
+    """Fix favicon 404 error"""
+    return '', 204
+
 @app.route('/')
 def index():
     return f"""
@@ -420,19 +565,6 @@ def health():
             'timestamp': datetime.now().isoformat()
         }), 500
 
-@app.route('/api/users')
-def api_users():
-    """API endpoint for users"""
-    try:
-        users = get_users()
-        return jsonify([{
-            'user_id': user[0] if len(user) > 0 else 0,
-            'username': user[1] if len(user) > 1 else '',
-            'first_name': user[2] if len(user) > 2 else ''
-        } for user in users])
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 # Main execution
 if __name__ == '__main__':
     print(f"🚀 Starting {BOT_NAME} combined service...")
@@ -443,8 +575,8 @@ if __name__ == '__main__':
         bot_thread.start()
         print("🤖 Bot thread started in background")
         
-        # Give bot a moment to initialize
-        time.sleep(1)
+        # Give bot time to initialize
+        time.sleep(5)
     else:
         print("❌ Missing BOT_TOKEN or BOT_OWNER_ID")
         bot_status = "Missing credentials"
