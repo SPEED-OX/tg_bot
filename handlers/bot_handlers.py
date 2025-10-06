@@ -1,11 +1,12 @@
 """
-TechGeekZ Bot - Simple Bot Handlers
-Clean bot command handling
+TechGeekZ Bot - Fixed Bot Handlers
+Direct webapp opening + Force command updates
 """
 import telebot
 from telebot import types
-from telebot.types import BotCommand
+from telebot.types import BotCommand, WebApp
 import os
+import time
 from datetime import datetime, timezone, timedelta
 
 # Simple config
@@ -23,29 +24,58 @@ class BotHandlers:
         self.db = database_manager
         self.bot = telebot.TeleBot(BOT_TOKEN, threaded=True)
         
-        # Update commands
-        self.update_commands()
+        # FORCE UPDATE COMMANDS - Multiple attempts
+        self.force_update_commands()
         
         # Register handlers
         self.register_handlers()
     
-    def update_commands(self):
-        """Update bot commands"""
-        try:
-            commands = [
-                BotCommand("start", "start the bot"),
-                BotCommand("user", "user settings"),
-                BotCommand("newpost", "create posts"),
-                BotCommand("schedules", "schedule settings"),
-                BotCommand("dashboard", "web dashboard"),
-                BotCommand("permit", "add user to whitelist"),
-                BotCommand("remove", "remove user from whitelist"),
-            ]
-            
-            self.bot.set_my_commands(commands)
-            print("✅ Commands updated")
-        except Exception as e:
-            print(f"❌ Command update failed: {e}")
+    def force_update_commands(self):
+        """FORCE update bot commands with retries"""
+        print("🔄 Force updating bot commands...")
+        
+        for attempt in range(3):
+            try:
+                print(f"Attempt {attempt + 1}/3 to update commands...")
+                
+                # Delete ALL old commands first
+                try:
+                    self.bot.delete_my_commands()
+                    print("🗑️ Old commands deleted")
+                    time.sleep(3)  # Wait for deletion to propagate
+                except:
+                    print("⚠️ No old commands to delete")
+                
+                # Set NEW commands
+                commands = [
+                    BotCommand("start", "start the bot"),
+                    BotCommand("user", "user settings"),
+                    BotCommand("newpost", "create posts"),
+                    BotCommand("schedules", "schedule settings"),
+                    BotCommand("dashboard", "web dashboard"),
+                    BotCommand("permit", "add user to whitelist"),
+                    BotCommand("remove", "remove user from whitelist"),
+                ]
+                
+                self.bot.set_my_commands(commands)
+                print("✅ NEW commands set successfully!")
+                
+                # Verify commands were actually set
+                time.sleep(2)
+                current_commands = self.bot.get_my_commands()
+                print(f"📋 Verified: {len(current_commands)} commands now active")
+                for cmd in current_commands:
+                    print(f"   /{cmd.command} - {cmd.description}")
+                
+                return True
+                
+            except Exception as e:
+                print(f"❌ Attempt {attempt + 1} failed: {e}")
+                if attempt < 2:  # Not last attempt
+                    time.sleep(5)
+                
+        print("❌ All command update attempts failed!")
+        return False
     
     def register_handlers(self):
         """Register all handlers"""
@@ -96,15 +126,35 @@ Use menu buttons or type commands."""
         
         @self.bot.message_handler(commands=['dashboard'])
         def handle_dashboard(message):
+            """FIXED - Direct webapp opening"""
             if not self.db.is_user_whitelisted(message.from_user.id):
                 self.bot.reply_to(message, "You are not authorized.")
                 return
             
-            if WEBAPP_URL:
+            if WEBAPP_URL and WEBAPP_URL.startswith('https://'):
                 dashboard_url = f"{WEBAPP_URL}/dashboard"
-                self.bot.send_message(message.chat.id, f"Dashboard: {dashboard_url}")
+                
+                try:
+                    # TRY WEBAPP BUTTON FIRST (opens directly in Telegram)
+                    keyboard = types.InlineKeyboardMarkup()
+                    keyboard.add(types.InlineKeyboardButton(
+                        "Open Dashboard", 
+                        web_app=WebApp(url=dashboard_url)
+                    ))
+                    
+                    # Send minimal message with webapp button
+                    self.bot.send_message(message.chat.id, "Dashboard", reply_markup=keyboard)
+                    
+                except Exception as e:
+                    print(f"WebApp failed: {e}")
+                    
+                    # FALLBACK - URL button (opens in browser)
+                    keyboard = types.InlineKeyboardMarkup()
+                    keyboard.add(types.InlineKeyboardButton("Open Dashboard", url=dashboard_url))
+                    self.bot.send_message(message.chat.id, "Dashboard", reply_markup=keyboard)
+                    
             else:
-                self.bot.reply_to(message, "Dashboard not available.")
+                self.bot.reply_to(message, "Dashboard URL not configured.")
         
         @self.bot.message_handler(commands=['user'])
         def handle_user(message):
@@ -122,6 +172,22 @@ Use menu buttons or type commands."""
                 user_list += f"{name} {uname}\nID: {user_id}\n\n"
             
             self.bot.send_message(message.chat.id, user_list)
+        
+        @self.bot.message_handler(commands=['newpost'])
+        def handle_newpost(message):
+            if not self.db.is_user_whitelisted(message.from_user.id):
+                self.bot.reply_to(message, "Unauthorized")
+                return
+            
+            self.bot.reply_to(message, "New post feature coming soon!")
+        
+        @self.bot.message_handler(commands=['schedules'])
+        def handle_schedules(message):
+            if not self.db.is_user_whitelisted(message.from_user.id):
+                self.bot.reply_to(message, "Unauthorized")
+                return
+            
+            self.bot.reply_to(message, "Schedules feature coming soon!")
         
         @self.bot.message_handler(commands=['permit'])
         def handle_permit(message):
@@ -166,18 +232,39 @@ Use menu buttons or type commands."""
                 self.bot.answer_callback_query(call.id, "Not authorized")
                 return
             
+            data = call.data
+            chat_id = call.message.chat.id
+            
+            if data == "start":
+                self.show_main_menu(chat_id, "Welcome back!")
+            elif data == "user":
+                self.bot.send_message(chat_id, "Use /user command for user management")
+            elif data == "newpost":
+                self.bot.send_message(chat_id, "Use /newpost command")
+            elif data == "schedules":
+                self.bot.send_message(chat_id, "Use /schedules command")
+            
             self.bot.answer_callback_query(call.id)
     
-    def show_main_menu(self, chat_id):
-        """Simple main menu"""
+    def show_main_menu(self, chat_id, text="Main Menu"):
+        """Main menu with DIRECT webapp button"""
         keyboard = types.InlineKeyboardMarkup()
         keyboard.row(types.InlineKeyboardButton("start", callback_data="start"))
-        keyboard.row(types.InlineKeyboardButton("user", callback_data="user"))
+        
+        if chat_id == BOT_OWNER_ID:
+            keyboard.row(types.InlineKeyboardButton("user", callback_data="user"))
+        
         keyboard.row(types.InlineKeyboardButton("newpost", callback_data="newpost"))
         keyboard.row(types.InlineKeyboardButton("schedules", callback_data="schedules"))
         
-        if WEBAPP_URL:
+        # DIRECT WEBAPP BUTTON in main menu
+        if WEBAPP_URL and WEBAPP_URL.startswith('https://'):
             dashboard_url = f"{WEBAPP_URL}/dashboard"
-            keyboard.row(types.InlineKeyboardButton("dashboard", url=dashboard_url))
+            try:
+                # WebApp button (opens directly in Telegram)
+                keyboard.row(types.InlineKeyboardButton("dashboard", web_app=WebApp(url=dashboard_url)))
+            except:
+                # Fallback URL button
+                keyboard.row(types.InlineKeyboardButton("dashboard", url=dashboard_url))
         
-        self.bot.send_message(chat_id, "Main Menu:", reply_markup=keyboard)
+        self.bot.send_message(chat_id, text, reply_markup=keyboard)
