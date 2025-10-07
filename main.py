@@ -34,9 +34,23 @@ def get_dashboard_status():
     """Get dashboard status"""
     return "Online" if WEBAPP_URL else "Offline"
 
-def get_owner_info():
-    """Get owner telegram info - you may need to customize this"""
-    return "Owner @Owner"  # Replace with actual telegram nickname and username
+def get_owner_telegram_info(bot):
+    """Get REAL owner telegram info via API"""
+    try:
+        chat = bot.get_chat(BOT_OWNER_ID)
+        first_name = chat.first_name or ""
+        last_name = chat.last_name or ""
+        username = chat.username or ""
+        
+        # Full telegram nickname + @username
+        full_name = f"{first_name} {last_name}".strip()
+        if username:
+            return f"{full_name} @{username}"
+        else:
+            return full_name or f"User {BOT_OWNER_ID}"
+    except Exception as e:
+        logger.error(f"Failed to get owner info: {e}")
+        return f"Owner {BOT_OWNER_ID}"
 
 class BotManager:
     """Advanced bot lifecycle manager"""
@@ -67,23 +81,26 @@ class BotManager:
             return False
     
     def send_deployment_notification(self):
-        """Send EXACT deployment notification format"""
+        """Send EXACT deployment notification format with REAL owner info"""
         if not self.bot_handler:
             return False
             
         try:
+            # Get REAL owner info from Telegram API
+            owner_info = get_owner_telegram_info(self.bot_handler.bot)
+            
             # EXACT deployment message format as requested
             deployment_message = f"""TechGeekZ Bot
 
 Time: {format_deployment_time()}
-Owner: {get_owner_info()}
+Owner: {owner_info}
 Dashboard: {get_dashboard_status()}
 
 Bot is active. Send /start to begin
 Send /help for all commands"""
 
             self.bot_handler.bot.send_message(BOT_OWNER_ID, deployment_message)
-            logger.info("📨 Deployment notification sent")
+            logger.info("📨 Deployment notification sent with real owner info")
             return True
             
         except Exception as e:
