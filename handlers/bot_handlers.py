@@ -1,10 +1,9 @@
 """
-TechGeekZ Bot - Fixed Bot Handlers
-Direct webapp opening + Force command updates
+TechGeekZ Bot - Fixed Bot Handlers (Compatible Version)
 """
 import telebot
 from telebot import types
-from telebot.types import BotCommand, WebApp
+from telebot.types import BotCommand
 import os
 import time
 from datetime import datetime, timezone, timedelta
@@ -24,7 +23,7 @@ class BotHandlers:
         self.db = database_manager
         self.bot = telebot.TeleBot(BOT_TOKEN, threaded=True)
         
-        # FORCE UPDATE COMMANDS - Multiple attempts
+        # FORCE UPDATE COMMANDS
         self.force_update_commands()
         
         # Register handlers
@@ -42,7 +41,7 @@ class BotHandlers:
                 try:
                     self.bot.delete_my_commands()
                     print("🗑️ Old commands deleted")
-                    time.sleep(3)  # Wait for deletion to propagate
+                    time.sleep(3)
                 except:
                     print("⚠️ No old commands to delete")
                 
@@ -60,18 +59,16 @@ class BotHandlers:
                 self.bot.set_my_commands(commands)
                 print("✅ NEW commands set successfully!")
                 
-                # Verify commands were actually set
+                # Verify commands
                 time.sleep(2)
                 current_commands = self.bot.get_my_commands()
                 print(f"📋 Verified: {len(current_commands)} commands now active")
-                for cmd in current_commands:
-                    print(f"   /{cmd.command} - {cmd.description}")
                 
                 return True
                 
             except Exception as e:
                 print(f"❌ Attempt {attempt + 1} failed: {e}")
-                if attempt < 2:  # Not last attempt
+                if attempt < 2:
                     time.sleep(5)
                 
         print("❌ All command update attempts failed!")
@@ -126,7 +123,7 @@ Use menu buttons or type commands."""
         
         @self.bot.message_handler(commands=['dashboard'])
         def handle_dashboard(message):
-            """FIXED - Direct webapp opening"""
+            """Dashboard with inline URL button"""
             if not self.db.is_user_whitelisted(message.from_user.id):
                 self.bot.reply_to(message, "You are not authorized.")
                 return
@@ -134,25 +131,14 @@ Use menu buttons or type commands."""
             if WEBAPP_URL and WEBAPP_URL.startswith('https://'):
                 dashboard_url = f"{WEBAPP_URL}/dashboard"
                 
-                try:
-                    # TRY WEBAPP BUTTON FIRST (opens directly in Telegram)
-                    keyboard = types.InlineKeyboardMarkup()
-                    keyboard.add(types.InlineKeyboardButton(
-                        "Open Dashboard", 
-                        web_app=WebApp(url=dashboard_url)
-                    ))
-                    
-                    # Send minimal message with webapp button
-                    self.bot.send_message(message.chat.id, "Dashboard", reply_markup=keyboard)
-                    
-                except Exception as e:
-                    print(f"WebApp failed: {e}")
-                    
-                    # FALLBACK - URL button (opens in browser)
-                    keyboard = types.InlineKeyboardMarkup()
-                    keyboard.add(types.InlineKeyboardButton("Open Dashboard", url=dashboard_url))
-                    self.bot.send_message(message.chat.id, "Dashboard", reply_markup=keyboard)
-                    
+                keyboard = types.InlineKeyboardMarkup()
+                keyboard.add(types.InlineKeyboardButton("Go to Dashboard", url=dashboard_url))
+                
+                self.bot.send_message(
+                    message.chat.id, 
+                    "🌐 Open your dashboard here:", 
+                    reply_markup=keyboard
+                )
             else:
                 self.bot.reply_to(message, "Dashboard URL not configured.")
         
@@ -247,7 +233,7 @@ Use menu buttons or type commands."""
             self.bot.answer_callback_query(call.id)
     
     def show_main_menu(self, chat_id, text="Main Menu"):
-        """Main menu with DIRECT webapp button"""
+        """Main menu with dashboard URL button"""
         keyboard = types.InlineKeyboardMarkup()
         keyboard.row(types.InlineKeyboardButton("start", callback_data="start"))
         
@@ -257,14 +243,9 @@ Use menu buttons or type commands."""
         keyboard.row(types.InlineKeyboardButton("newpost", callback_data="newpost"))
         keyboard.row(types.InlineKeyboardButton("schedules", callback_data="schedules"))
         
-        # DIRECT WEBAPP BUTTON in main menu
+        # Dashboard URL button (opens in browser)
         if WEBAPP_URL and WEBAPP_URL.startswith('https://'):
             dashboard_url = f"{WEBAPP_URL}/dashboard"
-            try:
-                # WebApp button (opens directly in Telegram)
-                keyboard.row(types.InlineKeyboardButton("dashboard", web_app=WebApp(url=dashboard_url)))
-            except:
-                # Fallback URL button
-                keyboard.row(types.InlineKeyboardButton("dashboard", url=dashboard_url))
+            keyboard.row(types.InlineKeyboardButton("dashboard", url=dashboard_url))
         
         self.bot.send_message(chat_id, text, reply_markup=keyboard)
