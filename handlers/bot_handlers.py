@@ -1,6 +1,6 @@
 """
 TechGeekZ Bot - Advanced Handler Architecture
-Using Command Pattern, Factory Pattern, and State Management
+Fixed message formats and proper inline keyboard menu
 """
 import telebot
 from telebot import types
@@ -23,8 +23,17 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 logger = logging.getLogger(__name__)
 
-def format_start_time():
+def format_current_time():
+    """Format current time for /start message"""
     return datetime.now(IST).strftime('%d/%m/%Y | %H:%M')
+
+def get_dashboard_status():
+    """Get dashboard status"""
+    return "Online" if WEBAPP_URL else "Offline"
+
+def get_owner_username():
+    """Get owner username - customize this"""
+    return "@Owner"  # Replace with actual owner telegram username
 
 class UserRole(Enum):
     """User role enumeration"""
@@ -135,17 +144,20 @@ class StartCommand(Command):
         # Update user in database
         self.db.add_user_to_whitelist(context.user_id, context.username, context.first_name)
         
+        # EXACT /start welcome message format as requested
         start_message = f"""Welcome to {BOT_NAME}
 
 Hello @{context.username}! What new are we thinking today..
 
-Owner: @Owner
-Dashboard: Online
-Time: {format_start_time()}
+Owner: {get_owner_username()}
+Dashboard: {get_dashboard_status()}
+Time: {format_current_time()}
 
 Bot is active. Send /help for all commands"""
 
         self.bot.send_message(context.chat_id, start_message)
+        
+        # Show INLINE KEYBOARD MENU (not just text "Main Menu")
         self._show_main_menu(context.chat_id)
         return True
     
@@ -153,7 +165,7 @@ Bot is active. Send /help for all commands"""
         return context.role != UserRole.UNAUTHORIZED
     
     def _show_main_menu(self, chat_id: int):
-        """Show main menu"""
+        """Show proper inline keyboard menu (not text)"""
         buttons = [
             [{'text': 'start', 'type': 'callback', 'data': 'start'}],
         ]
@@ -172,7 +184,9 @@ Bot is active. Send /help for all commands"""
             buttons.append([{'text': 'dashboard', 'type': 'url', 'url': dashboard_url}])
         
         keyboard = MenuRenderer.create_keyboard(buttons)
-        self.bot.send_message(chat_id, "Main Menu", reply_markup=keyboard)
+        
+        # Send EMPTY message with inline keyboard (no "Main Menu" text)
+        self.bot.send_message(chat_id, "⚡", reply_markup=keyboard)
 
 class HelpCommand(Command):
     def __init__(self, bot):
@@ -278,10 +292,27 @@ class MainMenuCallbackHandler(CallbackHandler):
         return data in self.menu_actions
     
     def _show_main_menu(self, context: UserContext, chat_id: int):
-        """Show main menu"""
-        start_cmd = self.command_registry.get_command('start')
-        if start_cmd:
-            start_cmd._show_main_menu(chat_id)
+        """Show main menu - proper inline keyboard"""
+        buttons = [
+            [{'text': 'start', 'type': 'callback', 'data': 'start'}],
+        ]
+        
+        if chat_id == BOT_OWNER_ID:
+            buttons.append([{'text': 'user', 'type': 'callback', 'data': 'user_menu'}])
+        
+        buttons.extend([
+            [{'text': 'newpost', 'type': 'callback', 'data': 'newpost'}],
+            [{'text': 'managepost', 'type': 'callback', 'data': 'managepost'}],
+            [{'text': 'schedules', 'type': 'callback', 'data': 'schedules'}],
+        ])
+        
+        if WEBAPP_URL and WEBAPP_URL.startswith('https://'):
+            dashboard_url = f"{WEBAPP_URL}/dashboard"
+            buttons.append([{'text': 'dashboard', 'type': 'url', 'url': dashboard_url}])
+        
+        keyboard = MenuRenderer.create_keyboard(buttons)
+        # Send just the keyboard without "Main Menu" text
+        self.bot.send_message(chat_id, "⚡", reply_markup=keyboard)
     
     def _show_user_menu(self, context: UserContext, chat_id: int):
         if context.role != UserRole.OWNER:
@@ -479,21 +510,59 @@ class BotHandlers:
             if command:
                 command.execute(context, message)
         
-        @self.bot.callback_query_handler(func=lambda call: True)
-        def handle_callback(call):
-            context = UserContext(
-                user_id=call.from_user.id,
-                username=call.from_user.username or "User",
-                first_name=call.from_user.first_name or "Unknown",
-                role=UserRole.OWNER if call.from_user.id == BOT_OWNER_ID else UserRole.USER,
-                chat_id=call.message.chat.id
-            )
-            
+        # Add missing command handlers
+        @self.bot.message_handler(commands=['newpost'])
+        def handle_newpost(message):
+            context = self._get_user_context(message)
             if context.role == UserRole.UNAUTHORIZED:
-                self.bot.answer_callback_query(call.id, "Not authorized")
+                self.bot.reply_to(message, "Unauthorized")
                 return
             
-            handled = self.callback_registry.handle_callback(context, call.data, call.message.chat.id)
-            self.bot.answer_callback_query(call.id)
+            # Show newpost channel selection
+            buttons = [
+                [{'text': 'Channel 1', 'type': 'callback', 'data': 'channel_1'}],
+                [{'text': 'Channel 2', 'type': 'callback', 'data': 'channel_2'}],
+                [{'text': 'Channel 3', 'type': 'callback', 'data': 'channel_3'}],
+            ]
+            keyboard = MenuRenderer.create_keyboard(buttons)
+            self.bot.send_message(context.chat_id, "📢 Select channel to post in:", reply_markup=keyboard)
         
-        logger.info("All handlers registered successfully")
+        @self.bot.message_handler(commands=['managepost'])
+        def handle_managepost(message):
+            context = self._get_user_context(message)
+            if context.role == UserRole.UNAUTHORIZED:
+                self.bot.reply_to(message, "Unauthorized")
+                return
+            
+            buttons = [
+                [{'text': 'edit post', 'type': 'callback', 'data': 'edit_existing'}],
+                [{'text': 'delete post', 'type': 'callback', 'data': 'delete_existing'}],
+            ]
+            keyboard = MenuRenderer.create_keyboard(buttons)
+            self.bot.send_message(context.chat_id, "⚙️ Manage Posts:", reply_markup=keyboard)
+        
+        @self.bot.message_handler(commands=['editpost'])
+        def handle_editpost(message):
+            context = self._get_user_context(message)
+            if context.role == UserRole.UNAUTHORIZED:
+                self.bot.reply_to(message, "Unauthorized")
+                return
+            self.bot.send_message(context.chat_id, "📝 Edit post feature:\n\nForward the message you want to edit, or use /managepost menu for advanced options.")
+        
+        @self.bot.message_handler(commands=['deletepost'])
+        def handle_deletepost(message):
+            context = self._get_user_context(message)
+            if context.role == UserRole.UNAUTHORIZED:
+                self.bot.reply_to(message, "Unauthorized")
+                return
+            self.bot.send_message(context.chat_id, "🗑️ Delete post feature:\n\nForward the message you want to delete, or use /managepost menu for advanced options.")
+        
+        @self.bot.message_handler(commands=['schedules'])
+        def handle_schedules(message):
+            context = self._get_user_context(message)
+            if context.role == UserRole.UNAUTHORIZED:
+                self.bot.reply_to(message, "Unauthorized")
+                return
+            
+            buttons = [
+                [{'text': 'scheduled posts', 'type': 'callback', 'data': 'scheduled_posts'}],

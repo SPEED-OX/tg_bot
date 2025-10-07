@@ -26,8 +26,17 @@ WEBAPP_URL = os.getenv('WEBAPP_URL', '')
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
-def format_time():
+def format_deployment_time():
+    """Format time for deployment message"""
     return datetime.now(IST).strftime('%d/%m/%Y %H:%M:%S IST')
+
+def get_dashboard_status():
+    """Get dashboard status"""
+    return "Online" if WEBAPP_URL else "Offline"
+
+def get_owner_info():
+    """Get owner telegram info - you may need to customize this"""
+    return "Owner @Owner"  # Replace with actual telegram nickname and username
 
 class BotManager:
     """Advanced bot lifecycle manager"""
@@ -58,18 +67,20 @@ class BotManager:
             return False
     
     def send_deployment_notification(self):
-        """Send single deployment notification"""
+        """Send EXACT deployment notification format"""
         if not self.bot_handler:
             return False
             
         try:
-            deployment_message = f"""{BOT_NAME}
+            # EXACT deployment message format as requested
+            deployment_message = f"""TechGeekZ Bot
 
-Time: {format_time()}
-Owner: Owner {BOT_OWNER_ID}
-Dashboard: Online
+Time: {format_deployment_time()}
+Owner: {get_owner_info()}
+Dashboard: {get_dashboard_status()}
 
-Bot is active. Send /start to begin"""
+Bot is active. Send /start to begin
+Send /help for all commands"""
 
             self.bot_handler.bot.send_message(BOT_OWNER_ID, deployment_message)
             logger.info("📨 Deployment notification sent")
