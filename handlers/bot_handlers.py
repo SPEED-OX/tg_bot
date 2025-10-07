@@ -566,3 +566,4 @@ class BotHandlers:
             
             buttons = [
                 [{'text': 'scheduled posts', 'type': 'callback', 'data': 'scheduled_posts'}],
+            ]
