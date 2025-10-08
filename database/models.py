@@ -1,6 +1,6 @@
 """
-TechGeekZ Bot - Database Manager
-Centralized database operations with user details integration
+ChatAudit Bot - Database Manager
+Centralized database operations with proper error handling
 """
 import sqlite3
 import os
@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import List, Tuple, Optional
 
 class DatabaseManager:
-    def __init__(self, db_path: str = "techgeekz.db"):
+    def __init__(self, db_path: str = "chataudit.db"):
         self.db_path = db_path
         self.init_database()
     
@@ -24,7 +24,6 @@ class DatabaseManager:
                 username TEXT,
                 first_name TEXT,
                 last_name TEXT,
-                nickname TEXT,
                 is_whitelisted INTEGER DEFAULT 0,
                 added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -87,14 +86,11 @@ class DatabaseManager:
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        # Create nickname from first_name and last_name
-        nickname = f"{first_name} {last_name}".strip() if first_name and last_name else first_name
-        
         cursor.execute('''
             INSERT OR REPLACE INTO users 
-            (user_id, username, first_name, last_name, nickname, is_whitelisted, updated_date)
-            VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
-        ''', (user_id, username, first_name, last_name, nickname))
+            (user_id, username, first_name, last_name, is_whitelisted, updated_date)
+            VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+        ''', (user_id, username, first_name, last_name))
         
         conn.commit()
         conn.close()
@@ -144,30 +140,13 @@ class DatabaseManager:
         
         return users
 
-    def get_whitelisted_users_with_details(self) -> List[Tuple]:
-        """Get all whitelisted users with detailed information"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT user_id, username, first_name, nickname
-            FROM users 
-            WHERE is_whitelisted = 1
-            ORDER BY added_date DESC
-        ''')
-        
-        users = cursor.fetchall()
-        conn.close()
-        
-        return users
-
     def get_user_info(self, user_id: int) -> Optional[Tuple]:
         """Get user information"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
         cursor.execute('''
-            SELECT user_id, username, first_name, last_name, nickname, is_whitelisted, added_date
+            SELECT user_id, username, first_name, last_name, is_whitelisted, added_date
             FROM users WHERE user_id = ?
         ''', (user_id,))
         

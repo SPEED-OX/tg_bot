@@ -1,15 +1,16 @@
 """
-TechGeekZ Bot - Menu System Handler
-Complete show/hide menu system with proper navigation
+ChatAudit Bot - Menu System Handler
+Complete inline keyboard menu system
 """
 from telebot import types
 import sys
 import os
+from datetime import datetime
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config import BOT_OWNER_ID, BOT_NAME, WEBAPP_URL
+from config import BOT_OWNER_ID, BOT_NAME, IST, WEBAPP_URL
 
 class MenuHandler:
     def __init__(self, bot, database_manager):
@@ -17,243 +18,252 @@ class MenuHandler:
         self.db = database_manager
         self.user_states = {}
     
-    def show_main_menu(self, chat_id, text="Main Menu"):
+    def show_main_menu(self, chat_id, text="🏠 **Main Menu**"):
         """Show the main inline keyboard menu"""
         keyboard = types.InlineKeyboardMarkup()
         
-        # Main menu buttons (no emojis)
-        keyboard.row(types.InlineKeyboardButton("start", callback_data="menu_start"))
+        # Main menu buttons
+        keyboard.row(types.InlineKeyboardButton("🏠 Start", callback_data="menu_start"))
         
         # User management for owner only
         if chat_id == BOT_OWNER_ID:
-            keyboard.row(types.InlineKeyboardButton("user", callback_data="menu_user"))
+            keyboard.row(types.InlineKeyboardButton("👥 User", callback_data="menu_user"))
         
-        keyboard.row(types.InlineKeyboardButton("newpost", callback_data="menu_newpost"))
-        keyboard.row(types.InlineKeyboardButton("schedules", callback_data="menu_schedules"))
+        keyboard.row(types.InlineKeyboardButton("📝 New Post", callback_data="menu_new_post"))
+        keyboard.row(types.InlineKeyboardButton("📅 Schedules", callback_data="menu_schedules"))
         
-        # Dashboard button
+        # Dashboard button if URL is configured
         if WEBAPP_URL and WEBAPP_URL.startswith('https://'):
             dashboard_url = f"{WEBAPP_URL}/dashboard"
-            keyboard.row(types.InlineKeyboardButton("dashboard", web_app=types.WebApp(dashboard_url)))
+            try:
+                keyboard.row(types.InlineKeyboardButton("📊 Dashboard", 
+                    web_app=types.WebApp(dashboard_url)))
+            except:
+                # Fallback if WebApp is not supported
+                pass
         
-        self.bot.send_message(chat_id, text, reply_markup=keyboard)
+        self.bot.send_message(chat_id, text, reply_markup=keyboard, parse_mode='Markdown')
 
     def show_user_menu(self, chat_id):
         """Show user management button menu"""
-        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
-        keyboard.row("users", "permit")
-        keyboard.row("remove", "back")
+        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+        keyboard.row("👥 Users", "➕ Permit <user_id>")
+        keyboard.row("➖ Remove <user_id>", "⬅️ Back")
         
-        text = "User Management\n\nSelect an option:"
-        
-        self.bot.send_message(chat_id, text, reply_markup=keyboard)
-        self.user_states[chat_id] = "user_menu"
+        text = f"""👥 **User Management Menu**
 
-    def show_newpost_menu(self, chat_id):
-        """Show newpost button menu"""
-        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
-        keyboard.row("send", "cancel")
-        keyboard.row("preview", "delete all")
-        keyboard.row("back")
+**Available Actions:**
+• **Users** - List all whitelisted users
+• **Permit <user_id>** - Add user to whitelist (Example: Permit 123456789)
+• **Remove <user_id>** - Remove user from whitelist (Example: Remove 123456789)
+• **Back** - Return to main menu
+
+**Note:** User IDs can be with or without minus signs (123456789 or -123456789)
+
+**Current Time (IST):** {datetime.now(IST).strftime('%d/%m %H:%M')}"""
         
-        text = "New Post\n\nFirst add your content, then select an option:"
-        
-        self.bot.send_message(chat_id, text, reply_markup=keyboard)
-        self.user_states[chat_id] = "newpost_menu"
+        self.bot.send_message(chat_id, text, reply_markup=keyboard, parse_mode='Markdown')
 
     def show_schedules_menu(self, chat_id):
         """Show schedules button menu"""
-        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
-        keyboard.row("scheduled posts", "self-destruct timings")
-        keyboard.row("cancel", "back")
+        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+        keyboard.row("📋 Scheduled Posts", "💣 Self-Destruct Timings")
+        keyboard.row("❌ Cancel", "⬅️ Back")
         
-        text = "Schedules\n\nSelect an option:"
-        
-        self.bot.send_message(chat_id, text, reply_markup=keyboard)
-        self.user_states[chat_id] = "schedules_menu"
+        text = f"""📅 **Schedules Menu**
 
-    def show_send_options(self, chat_id):
-        """Show send options inline buttons"""
+**Available Actions:**
+• **Scheduled Posts** - View all scheduled posts and timings
+• **Self-Destruct Timings** - View all self-destruct posts and timings
+• **Cancel** - Cancel scheduled or self-destruct tasks
+• **Back** - Return to main menu
+
+**Current Time (IST):** {datetime.now(IST).strftime('%d/%m %H:%M')}"""
+        
+        self.bot.send_message(chat_id, text, reply_markup=keyboard, parse_mode='Markdown')
+
+    def show_cancel_menu(self, chat_id):
+        """Show cancel submenu with inline buttons"""
         keyboard = types.InlineKeyboardMarkup()
-        keyboard.row(types.InlineKeyboardButton("schedule post", callback_data="send_schedule"))
-        keyboard.row(types.InlineKeyboardButton("self-destruct", callback_data="send_destruct"))
-        keyboard.row(types.InlineKeyboardButton("post now", callback_data="send_now"))
-        keyboard.row(types.InlineKeyboardButton("back", callback_data="send_back"))
+        keyboard.row(types.InlineKeyboardButton("💣 Self-Destruct", callback_data="cancel_self_destruct"))
+        keyboard.row(types.InlineKeyboardButton("📅 Scheduled Post", callback_data="cancel_scheduled"))
+        keyboard.row(types.InlineKeyboardButton("⬅️ Back", callback_data="menu_schedules"))
         
-        text = "Send Options\n\nChoose how to send your post:"
-        
-        self.bot.send_message(chat_id, text, reply_markup=keyboard)
+        text = """❌ **Cancel Tasks**
 
-    def show_cancel_options(self, chat_id):
-        """Show cancel options inline buttons"""
-        keyboard = types.InlineKeyboardMarkup()
-        keyboard.row(types.InlineKeyboardButton("self-destruct", callback_data="cancel_destruct"))
-        keyboard.row(types.InlineKeyboardButton("scheduled post", callback_data="cancel_scheduled"))
-        keyboard.row(types.InlineKeyboardButton("back", callback_data="cancel_back"))
+Choose task type to cancel:"""
         
-        text = "Cancel Tasks\n\nChoose what to cancel:"
-        
-        self.bot.send_message(chat_id, text, reply_markup=keyboard)
-
-    def hide_button_menu(self, chat_id):
-        """Hide current button menu"""
-        keyboard = types.ReplyKeyboardRemove()
-        self.bot.send_message(chat_id, "Menu hidden", reply_markup=keyboard)
-        if chat_id in self.user_states:
-            del self.user_states[chat_id]
+        self.bot.send_message(chat_id, text, reply_markup=keyboard, parse_mode='Markdown')
 
     def handle_callback_query(self, call):
         """Handle all callback queries from inline keyboards"""
         user_id = call.from_user.id
-        chat_id = call.message.chat.id
         
         if not self.db.is_user_whitelisted(user_id):
-            self.bot.answer_callback_query(call.id, "Not authorized")
+            self.bot.answer_callback_query(call.id, "❌ Not authorized")
             return
         
         data = call.data
         
-        # Main menu callbacks
         if data == "menu_start":
-            self.show_main_menu(chat_id, "Welcome back to the main menu!")
+            self.show_main_menu(call.message.chat.id, "🏠 **Welcome back to the main menu!**")
             
         elif data == "menu_user" and user_id == BOT_OWNER_ID:
-            self.show_user_menu(chat_id)
+            self.show_user_menu(call.message.chat.id)
             
-        elif data == "menu_newpost":
-            self.show_newpost_menu(chat_id)
+        elif data == "menu_new_post":
+            self.show_channel_selection(call.message.chat.id)
             
         elif data == "menu_schedules":
-            self.show_schedules_menu(chat_id)
-        
-        # Send options callbacks
-        elif data == "send_schedule":
-            self.bot.send_message(chat_id, "Enter date and time for scheduling:\nFormat: dd/mm hh:mm (24hr format)")
-            self.hide_button_menu(chat_id)
+            self.show_schedules_menu(call.message.chat.id)
             
-        elif data == "send_destruct":
-            self.bot.send_message(chat_id, "Enter date and time for self-destruct:\nFormat: dd/mm hh:mm (24hr format)")
-            self.hide_button_menu(chat_id)
-            
-        elif data == "send_now":
-            self.bot.send_message(chat_id, "Post sent instantly!")
-            self.hide_button_menu(chat_id)
-            
-        elif data == "send_back":
-            # Go back to newpost menu
-            self.show_newpost_menu(chat_id)
-        
-        # Cancel options callbacks
-        elif data == "cancel_destruct":
-            self.bot.send_message(chat_id, "Self-destruct task cancelled!")
-            self.hide_button_menu(chat_id)
-            
+        elif data == "cancel_self_destruct":
+            self.bot.send_message(call.message.chat.id, 
+                "💣 Self-destruct task cancellation coming soon!")
+                
         elif data == "cancel_scheduled":
-            self.bot.send_message(chat_id, "Scheduled post cancelled!")
-            self.hide_button_menu(chat_id)
-            
-        elif data == "cancel_back":
-            # Go back to schedules menu
-            self.show_schedules_menu(chat_id)
+            self.bot.send_message(call.message.chat.id, 
+                "📅 Scheduled post cancellation coming soon!")
         
         self.bot.answer_callback_query(call.id)
+
+    def show_channel_selection(self, chat_id):
+        """Show channel selection for new posts"""
+        channels = self.db.get_user_channels(chat_id)
+        
+        if not channels:
+            keyboard = types.InlineKeyboardMarkup()
+            keyboard.row(types.InlineKeyboardButton("⬅️ Back", callback_data="menu_start"))
+            
+            text = """📝 **New Post**
+
+❌ No channels added yet.
+
+Use /addchannel @channelname to add channels first.
+
+**Example:** /addchannel @mychannel"""
+            
+            self.bot.send_message(chat_id, text, reply_markup=keyboard, parse_mode='Markdown')
+            return
+        
+        keyboard = types.InlineKeyboardMarkup()
+        
+        for channel in channels:
+            keyboard.row(types.InlineKeyboardButton(f"{channel['name']}", 
+                callback_data=f"select_channel_{channel['id']}"))
+        
+        keyboard.row(types.InlineKeyboardButton("⬅️ Back", callback_data="menu_start"))
+        
+        text = """📝 **New Post - Select Channel**
+
+Choose a channel to post in:"""
+        
+        self.bot.send_message(chat_id, text, reply_markup=keyboard, parse_mode='Markdown')
 
     def handle_messages(self, message):
         """Handle button menu messages and regular text"""
         user_id = message.from_user.id
-        chat_id = message.chat.id
         text = message.text.strip() if message.text else ""
         
         if not self.db.is_user_whitelisted(user_id):
-            self.bot.reply_to(message, "You are not authorized to use this bot.")
+            self.bot.reply_to(message, "❌ You are not authorized to use this bot.")
             return
         
-        current_state = self.user_states.get(chat_id, "")
-        
-        # Handle user menu buttons
-        if current_state == "user_menu":
-            if text == "users":
-                self.handle_list_users(message)
-            elif text == "permit":
-                self.bot.reply_to(message, "Enter user ID to permit:\nFormat: permit <user_id>\nExample: 123456789")
-            elif text == "remove":
-                self.bot.reply_to(message, "Enter user ID to remove:\nFormat: remove <user_id>\nExample: 123456789")
-            elif text == "back":
-                self.hide_button_menu(chat_id)
-                self.show_main_menu(chat_id, "Returned to main menu")
-        
-        # Handle newpost menu buttons
-        elif current_state == "newpost_menu":
-            if text == "send":
-                self.show_send_options(chat_id)
-            elif text == "cancel":
-                self.bot.reply_to(message, "Current task cancelled!")
-                self.hide_button_menu(chat_id)
-            elif text == "preview":
-                self.bot.reply_to(message, "Post preview shown!")
-            elif text == "delete all":
-                self.bot.reply_to(message, "Draft deleted!")
-                self.hide_button_menu(chat_id)
-            elif text == "back":
-                self.hide_button_menu(chat_id)
-                self.show_main_menu(chat_id, "Returned to main menu")
-        
-        # Handle schedules menu buttons
-        elif current_state == "schedules_menu":
-            if text == "scheduled posts":
-                self.handle_show_scheduled_posts(message)
-            elif text == "self-destruct timings":
-                self.handle_show_self_destruct_posts(message)
-            elif text == "cancel":
-                self.show_cancel_options(chat_id)
-            elif text == "back":
-                self.hide_button_menu(chat_id)
-                self.show_main_menu(chat_id, "Returned to main menu")
-        
-        # Handle permit/remove user ID input
-        elif text.startswith("permit ") or text.startswith("remove "):
-            if user_id == BOT_OWNER_ID:
-                parts = text.split()
-                if len(parts) == 2:
-                    try:
-                        target_user_id = int(parts[1].replace('-', ''))
-                        if text.startswith("permit"):
-                            self.db.add_user_to_whitelist(target_user_id)
-                            self.bot.reply_to(message, f"User {target_user_id} added to whitelist!")
-                        else:
-                            if target_user_id != BOT_OWNER_ID:
-                                self.db.remove_user_from_whitelist(target_user_id)
-                                self.bot.reply_to(message, f"User {target_user_id} removed from whitelist!")
-                            else:
-                                self.bot.reply_to(message, "Cannot remove bot owner!")
-                    except ValueError:
-                        self.bot.reply_to(message, "Invalid user ID format!")
-                else:
-                    self.bot.reply_to(message, "Invalid format. Use: permit <user_id> or remove <user_id>")
-            else:
-                self.bot.reply_to(message, "Owner only command!")
+        # Handle button menu commands
+        if text == "👥 Users" and user_id == BOT_OWNER_ID:
+            self.handle_list_users(message)
+            
+        elif text.startswith("➕ Permit") and user_id == BOT_OWNER_ID:
+            self.handle_permit_user(message)
+            
+        elif text.startswith("➖ Remove") and user_id == BOT_OWNER_ID:
+            self.handle_remove_user(message)
+            
+        elif text == "⬅️ Back":
+            self.show_main_menu(message.chat.id)
+            
+        elif text == "📋 Scheduled Posts":
+            self.handle_show_scheduled_posts(message)
+            
+        elif text == "💣 Self-Destruct Timings":
+            self.handle_show_self_destruct_posts(message)
+            
+        elif text == "❌ Cancel":
+            self.show_cancel_menu(message.chat.id)
+            
+        else:
+            # Handle as regular message or unknown command
+            if text and not text.startswith('/'):
+                self.bot.reply_to(message, 
+                    "📝 Message received. Use the menu buttons or /help for available commands.")
 
     def handle_list_users(self, message):
         """Handle listing whitelisted users"""
-        users = self.db.get_whitelisted_users_with_details()
+        users = self.db.get_whitelisted_users()
         
         if not users:
-            self.bot.reply_to(message, "No whitelisted users found.")
+            self.bot.reply_to(message, "📋 No whitelisted users found.")
             return
         
-        user_list = f"Whitelisted Users ({len(users)}):\n\n"
+        user_list = f"👥 **Whitelisted Users ({len(users)}):**\n\n"
         for user in users:
-            user_id, username, first_name, nickname = user
-            display_name = nickname or first_name or "Unknown"
-            display_username = f"@{username}" if username else "No username"
-            user_list += f"{display_name} {display_username}\nID: {user_id}\n\n"
+            display_name = f"@{user[1]}" if user[1] else user[2] or "Unknown"
+            user_list += f"• **{display_name}** (ID: `{user[0]}`)\n"
         
-        self.bot.send_message(message.chat.id, user_list)
+        self.bot.send_message(message.chat.id, user_list, parse_mode='Markdown')
+
+    def handle_permit_user(self, message):
+        """Handle adding user to whitelist"""
+        try:
+            parts = message.text.split()
+            if len(parts) < 2:
+                self.bot.reply_to(message, 
+                    "**Usage:** Permit <user_id>\n**Example:** Permit 123456789")
+                return
+            
+            user_id_str = parts[1].replace('-', '')
+            user_id = int(user_id_str)
+            
+            self.db.add_user_to_whitelist(user_id)
+            self.bot.reply_to(message, f"✅ User `{user_id}` added to whitelist!")
+            
+        except ValueError:
+            self.bot.reply_to(message, "❌ Invalid user ID. Please provide a numeric user ID.")
+        except Exception as e:
+            self.bot.reply_to(message, f"❌ Error: {str(e)}")
+
+    def handle_remove_user(self, message):
+        """Handle removing user from whitelist"""
+        try:
+            parts = message.text.split()
+            if len(parts) < 2:
+                self.bot.reply_to(message, 
+                    "**Usage:** Remove <user_id>\n**Example:** Remove 123456789")
+                return
+            
+            user_id_str = parts[1].replace('-', '')
+            user_id = int(user_id_str)
+            
+            if user_id == BOT_OWNER_ID:
+                self.bot.reply_to(message, "❌ Cannot remove bot owner from whitelist!")
+                return
+            
+            self.db.remove_user_from_whitelist(user_id)
+            self.bot.reply_to(message, f"✅ User `{user_id}` removed from whitelist!")
+            
+        except ValueError:
+            self.bot.reply_to(message, "❌ Invalid user ID. Please provide a numeric user ID.")
+        except Exception as e:
+            self.bot.reply_to(message, f"❌ Error: {str(e)}")
 
     def handle_show_scheduled_posts(self, message):
         """Show scheduled posts"""
-        self.bot.reply_to(message, "Scheduled Posts\n\nNo scheduled posts found.")
+        # For now, return placeholder
+        self.bot.reply_to(message, 
+            "📋 **Scheduled Posts**\n\nNo scheduled posts found.\n\nScheduled post feature coming soon!")
 
     def handle_show_self_destruct_posts(self, message):
         """Show self-destruct posts"""  
-        self.bot.reply_to(message, "Self-Destruct Posts\n\nNo self-destruct posts found.")
+        # For now, return placeholder
+        self.bot.reply_to(message, 
+            "💣 **Self-Destruct Posts**\n\nNo self-destruct posts found.\n\nSelf-destruct feature coming soon!")
