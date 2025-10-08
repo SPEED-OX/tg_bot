@@ -1,11 +1,11 @@
 """
-TechGeekZ Bot - CORRECT KEYBOARD IMPLEMENTATION
-Reply Keyboard Menu + Inline Buttons + Button Menus
-Enterprise Architecture with PROPER keyboard types
+TechGeekZ Bot - ENTERPRISE ARCHITECTURE with CORRECT Button Types
+Strategy Pattern + Observer Pattern + Event-Driven Design
+RED = Inline Keyboard Menu, GREEN = Button Menu, BLUE = Inline Buttons
 """
 import telebot
 from telebot import types
-from telebot.types import BotCommand, ReplyKeyboardMarkup, KeyboardButton
+from telebot.types import BotCommand
 import os
 import time
 import logging
@@ -29,8 +29,10 @@ def format_current_time():
 def get_dashboard_status():
     return "Online" if WEBAPP_URL else "Offline"
 
+# Event-Driven Architecture
 @dataclass
 class BotEvent:
+    """Unified event structure"""
     event_type: str
     user_id: int
     chat_id: int
@@ -39,6 +41,8 @@ class BotEvent:
     callback_query: Any = None
 
 class EventHandler(ABC):
+    """Abstract event handler"""
+    
     @abstractmethod
     def can_handle(self, event: BotEvent) -> bool:
         pass
@@ -48,6 +52,8 @@ class EventHandler(ABC):
         pass
 
 class EventDispatcher:
+    """Event dispatcher using Observer Pattern"""
+    
     def __init__(self):
         self.handlers: List[EventHandler] = []
     
@@ -61,147 +67,160 @@ class EventDispatcher:
                 return handler.handle(event)
         return False
 
-class KeyboardFactory:
-    """Factory for creating different keyboard types"""
-    
-    @staticmethod
-    def create_reply_keyboard_menu(buttons: List[List[str]], resize=True, one_time=False) -> ReplyKeyboardMarkup:
-        """Create REPLY KEYBOARD MENU (native keyboard menu at bottom)"""
-        keyboard = ReplyKeyboardMarkup(resize_keyboard=resize, one_time_keyboard=one_time)
-        
-        for row in buttons:
-            keyboard_buttons = [KeyboardButton(btn) for btn in row]
-            keyboard.row(*keyboard_buttons)
-        
-        return keyboard
-    
-    @staticmethod
-    def create_inline_buttons(buttons: List[List[dict]]) -> types.InlineKeyboardMarkup:
-        """Create INLINE BUTTONS (floating above messages)"""
-        keyboard = types.InlineKeyboardMarkup()
-        
-        for row in buttons:
-            button_row = []
-            for btn in row:
-                if btn['type'] == 'callback':
-                    button_row.append(types.InlineKeyboardButton(btn['text'], callback_data=btn['data']))
-                elif btn['type'] == 'url':
-                    button_row.append(types.InlineKeyboardButton(btn['text'], url=btn['url']))
-            
-            if button_row:
-                keyboard.row(*button_row)
-        
-        return keyboard
-
-class MenuManager:
-    """Advanced menu management with proper keyboard types"""
+# Strategy Pattern for Different Button Types
+class MenuStrategy(ABC):
+    """Abstract menu strategy"""
     
     def __init__(self, bot, db):
         self.bot = bot
         self.db = db
     
-    def show_main_reply_keyboard_menu(self, chat_id: int):
-        """Show MAIN REPLY KEYBOARD MENU (native menu at bottom like red circle)"""
-        main_buttons = [["start"]]
+    @abstractmethod
+    def show_menu(self, chat_id: int, **kwargs):
+        pass
+    
+    def get_real_username(self, user_id: int) -> str:
+        try:
+            chat = self.bot.get_chat(user_id)
+            return chat.username or f"User{user_id}"
+        except:
+            return f"User{user_id}"
+    
+    def get_owner_username(self) -> str:
+        try:
+            chat = self.bot.get_chat(BOT_OWNER_ID)
+            username = chat.username
+            return f"@{username}" if username else f"@User{BOT_OWNER_ID}"
+        except:
+            return f"@User{BOT_OWNER_ID}"
+
+# RED CIRCLE - Inline Keyboard Menu (Main Navigation)
+class MainInlineKeyboardMenuStrategy(MenuStrategy):
+    def show_menu(self, chat_id: int, **kwargs):
+        """RED CIRCLE - Main inline keyboard menu at bottom"""
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.row(types.InlineKeyboardButton("start", callback_data="start"))
         
         if chat_id == BOT_OWNER_ID:
-            main_buttons.append(["user"])
+            keyboard.row(types.InlineKeyboardButton("user", callback_data="user_menu"))
         
-        main_buttons.extend([
-            ["newpost"], 
-            ["managepost"], 
-            ["schedules"], 
-            ["dashboard"]
-        ])
+        keyboard.row(types.InlineKeyboardButton("newpost", callback_data="newpost"))
+        keyboard.row(types.InlineKeyboardButton("managepost", callback_data="managepost"))
+        keyboard.row(types.InlineKeyboardButton("schedules", callback_data="schedules"))
         
-        keyboard = KeyboardFactory.create_reply_keyboard_menu(main_buttons, resize=True)
-        self.bot.send_message(chat_id, "Main menu activated:", reply_markup=keyboard)
-    
-    def show_user_button_menu(self, chat_id: int):
-        """Show USER BUTTON MENU (green circle type)"""
-        keyboard = KeyboardFactory.create_inline_buttons([
-            [{'text': 'users', 'type': 'callback', 'data': 'users_list'}],
-            [{'text': 'permit <user_id>', 'type': 'callback', 'data': 'permit_user'}],
-            [{'text': 'remove <user_id>', 'type': 'callback', 'data': 'remove_user'}],
-            [{'text': '<<back', 'type': 'callback', 'data': 'main_menu'}]
-        ])
+        if WEBAPP_URL and WEBAPP_URL.startswith('https://'):
+            keyboard.row(types.InlineKeyboardButton("dashboard", url=f"{WEBAPP_URL}/dashboard"))
+        
+        self.bot.send_message(chat_id, "Menu:", reply_markup=keyboard)
+
+# GREEN CIRCLE - Button Menu (Reply Keyboard)
+class UserButtonMenuStrategy(MenuStrategy):
+    def show_menu(self, chat_id: int, **kwargs):
+        """GREEN CIRCLE - User button menu (reply keyboard)"""
+        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
+        keyboard.row("users", "permit <user_id>")
+        keyboard.row("remove <user_id>", "<<back")
         
         self.bot.send_message(chat_id, "👥 User Management:", reply_markup=keyboard)
-    
-    def show_newpost_inline_buttons(self, chat_id: int):
-        """Show NEWPOST INLINE BUTTONS (blue circle type)"""
-        keyboard = KeyboardFactory.create_inline_buttons([
-            [{'text': 'Channel 1', 'type': 'callback', 'data': 'channel_1'}],
-            [{'text': 'Channel 2', 'type': 'callback', 'data': 'channel_2'}],
-            [{'text': 'Channel 3', 'type': 'callback', 'data': 'channel_3'}],
-            [{'text': '<<back', 'type': 'callback', 'data': 'main_menu'}]
-        ])
+
+class NewPostButtonMenuStrategy(MenuStrategy):
+    def show_menu(self, chat_id: int, **kwargs):
+        """GREEN CIRCLE - Newpost button menu (reply keyboard)"""
+        # First show channel selection as inline buttons
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.row(types.InlineKeyboardButton("Channel 1", callback_data="channel_1"))
+        keyboard.row(types.InlineKeyboardButton("Channel 2", callback_data="channel_2"))
+        keyboard.row(types.InlineKeyboardButton("Channel 3", callback_data="channel_3"))
+        keyboard.row(types.InlineKeyboardButton("<<back", callback_data="main_menu"))
         
         self.bot.send_message(chat_id, "📢 Select channel to post in:", reply_markup=keyboard)
-    
-    def show_send_inline_buttons(self, chat_id: int):
-        """Show SEND INLINE BUTTONS (blue circle type)"""
-        keyboard = KeyboardFactory.create_inline_buttons([
-            [{'text': 'schedule post', 'type': 'callback', 'data': 'schedule_post'}],
-            [{'text': 'self-destruct', 'type': 'callback', 'data': 'self_destruct'}],
-            [{'text': 'post now', 'type': 'callback', 'data': 'post_now'}],
-            [{'text': '<<back', 'type': 'callback', 'data': 'newpost_menu'}]
-        ])
-        
-        self.bot.send_message(chat_id, "📤 Send Options:", reply_markup=keyboard)
-    
-    def show_post_creation_button_menu(self, chat_id: int, channel: str):
-        """Show POST CREATION BUTTON MENU (green circle type)"""
-        keyboard = KeyboardFactory.create_inline_buttons([
-            [{'text': 'send', 'type': 'callback', 'data': 'send_menu'}],
-            [{'text': 'cancel', 'type': 'callback', 'data': 'cancel_post'}],
-            [{'text': 'preview', 'type': 'callback', 'data': 'preview_post'}],
-            [{'text': 'delete all', 'type': 'callback', 'data': 'delete_all'}],
-            [{'text': '<<back', 'type': 'callback', 'data': 'newpost'}]
-        ])
+
+class PostCreationButtonMenuStrategy(MenuStrategy):
+    def show_menu(self, chat_id: int, **kwargs):
+        """GREEN CIRCLE - Post creation button menu after channel selection"""
+        channel = kwargs.get('channel', 'Unknown')
+        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
+        keyboard.row("send", "cancel")
+        keyboard.row("preview", "delete all")
+        keyboard.row("<<back")
         
         self.bot.send_message(chat_id, f"✍️ Creating post for {channel}\n\nSend your content:", reply_markup=keyboard)
 
-class CommandEventHandler(EventHandler):
-    def __init__(self, bot, db, menu_manager):
+class ManagePostButtonMenuStrategy(MenuStrategy):
+    def show_menu(self, chat_id: int, **kwargs):
+        """GREEN CIRCLE - Managepost button menu"""
+        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
+        keyboard.row("edit post", "delete post")
+        keyboard.row("<<back")
+        
+        self.bot.send_message(chat_id, "⚙️ Manage Posts:", reply_markup=keyboard)
+
+class SchedulesButtonMenuStrategy(MenuStrategy):
+    def show_menu(self, chat_id: int, **kwargs):
+        """GREEN CIRCLE - Schedules button menu"""
+        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
+        keyboard.row("scheduled posts", "self-destruct timings")
+        keyboard.row("cancel", "<<back")
+        
+        self.bot.send_message(chat_id, "⏰ Schedules Management:", reply_markup=keyboard)
+
+# BLUE CIRCLE - Inline Buttons (Action Buttons)
+class SendInlineButtonsStrategy(MenuStrategy):
+    def show_menu(self, chat_id: int, **kwargs):
+        """BLUE CIRCLE - Send inline buttons"""
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.row(types.InlineKeyboardButton("schedule post", callback_data="schedule_post"))
+        keyboard.row(types.InlineKeyboardButton("self-destruct", callback_data="self_destruct"))
+        keyboard.row(types.InlineKeyboardButton("post now", callback_data="post_now"))
+        keyboard.row(types.InlineKeyboardButton("<<back", callback_data="newpost_back"))
+        
+        self.bot.send_message(chat_id, "📤 Send Options:", reply_markup=keyboard)
+
+class CancelInlineButtonsStrategy(MenuStrategy):
+    def show_menu(self, chat_id: int, **kwargs):
+        """BLUE CIRCLE - Cancel inline buttons"""
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.row(types.InlineKeyboardButton("self-destruct", callback_data="cancel_destruct"))
+        keyboard.row(types.InlineKeyboardButton("scheduled post", callback_data="cancel_scheduled"))
+        keyboard.row(types.InlineKeyboardButton("<<back", callback_data="schedules_back"))
+        
+        self.bot.send_message(chat_id, "❌ Cancel Options:", reply_markup=keyboard)
+
+# Command Strategy Pattern
+class CommandStrategy(ABC):
+    def __init__(self, bot, db, menu_factory):
         self.bot = bot
         self.db = db
-        self.menu_manager = menu_manager
-        self.command_handlers = {
-            'start': self._handle_start,
-            'help': self._handle_help,
-            'dashboard': self._handle_dashboard,
-            'user': self._handle_user,
-            'newpost': self._handle_newpost,
-            'managepost': self._handle_managepost,
-            'editpost': self._handle_editpost,
-            'deletepost': self._handle_deletepost,
-            'schedules': self._handle_schedules,
-            'permit': self._handle_permit,
-            'remove': self._handle_remove
-        }
+        self.menu_factory = menu_factory
     
-    def can_handle(self, event: BotEvent) -> bool:
-        return event.event_type == 'command'
+    @abstractmethod
+    def execute(self, event: BotEvent) -> bool:
+        pass
     
-    def handle(self, event: BotEvent) -> bool:
-        handler = self.command_handlers.get(event.data)
-        return handler(event) if handler else False
+    def can_execute(self, user_id: int) -> bool:
+        return self.db.is_user_whitelisted(user_id)
     
-    def _handle_start(self, event: BotEvent) -> bool:
-        if not self.db.is_user_whitelisted(event.user_id):
+    def is_owner(self, user_id: int) -> bool:
+        return user_id == BOT_OWNER_ID
+
+class StartCommandStrategy(CommandStrategy):
+    def execute(self, event: BotEvent) -> bool:
+        if not self.can_execute(event.user_id):
             self.bot.reply_to(event.message, "You are not authorized to use this bot.")
             return False
         
-        # Get REAL usernames via API
+        # Get REAL current username
         try:
-            user_chat = self.bot.get_chat(event.user_id)
-            real_username = user_chat.username or f"User{event.user_id}"
-            
+            chat = self.bot.get_chat(event.user_id)
+            real_username = chat.username or f"User{event.user_id}"
+        except:
+            real_username = f"User{event.user_id}"
+        
+        # Get owner username
+        try:
             owner_chat = self.bot.get_chat(BOT_OWNER_ID)
             owner_username = f"@{owner_chat.username}" if owner_chat.username else f"@User{BOT_OWNER_ID}"
         except:
-            real_username = f"User{event.user_id}"
             owner_username = f"@User{BOT_OWNER_ID}"
         
         # Update user in database
@@ -219,13 +238,13 @@ Time: {format_current_time()}
 Bot is active. Send /help for all commands"""
 
         self.bot.send_message(event.chat_id, start_message)
-        
-        # Show REPLY KEYBOARD MENU (native menu at bottom)
-        self.menu_manager.show_main_reply_keyboard_menu(event.chat_id)
+        # Show RED CIRCLE - Main inline keyboard menu
+        self.menu_factory.get_menu('main_inline').show_menu(event.chat_id)
         return True
-    
-    def _handle_help(self, event: BotEvent) -> bool:
-        if not self.db.is_user_whitelisted(event.user_id):
+
+class HelpCommandStrategy(CommandStrategy):
+    def execute(self, event: BotEvent) -> bool:
+        if not self.can_execute(event.user_id):
             self.bot.reply_to(event.message, "You are not authorized.")
             return False
         
@@ -247,141 +266,51 @@ Use menu buttons or type commands directly."""
         
         self.bot.send_message(event.chat_id, help_text)
         return True
-    
-    def _handle_dashboard(self, event: BotEvent) -> bool:
-        if not self.db.is_user_whitelisted(event.user_id):
-            self.bot.reply_to(event.message, "You are not authorized.")
-            return False
-        
-        if WEBAPP_URL and WEBAPP_URL.startswith('https://'):
-            keyboard = KeyboardFactory.create_inline_buttons([
-                [{'text': 'Go to Dashboard', 'type': 'url', 'url': f"{WEBAPP_URL}/dashboard"}]
-            ])
-            self.bot.send_message(event.chat_id, "🌐 Open your dashboard here:", reply_markup=keyboard)
-        else:
-            self.bot.reply_to(event.message, "Dashboard URL not configured.")
-        return True
-    
-    def _handle_user(self, event: BotEvent) -> bool:
-        if event.user_id != BOT_OWNER_ID:
-            self.bot.reply_to(event.message, "Owner only.")
-            return False
-        
-        self.menu_manager.show_user_button_menu(event.chat_id)
-        return True
-    
-    def _handle_newpost(self, event: BotEvent) -> bool:
-        if not self.db.is_user_whitelisted(event.user_id):
-            self.bot.reply_to(event.message, "Unauthorized")
-            return False
-        
-        self.menu_manager.show_newpost_inline_buttons(event.chat_id)
-        return True
-    
-    def _handle_managepost(self, event: BotEvent) -> bool:
-        if not self.db.is_user_whitelisted(event.user_id):
-            self.bot.reply_to(event.message, "Unauthorized")
-            return False
-        
-        keyboard = KeyboardFactory.create_inline_buttons([
-            [{'text': 'edit post', 'type': 'callback', 'data': 'edit_existing'}],
-            [{'text': 'delete post', 'type': 'callback', 'data': 'delete_existing'}]
-        ])
-        self.bot.send_message(event.chat_id, "⚙️ Manage Posts:", reply_markup=keyboard)
-        return True
-    
-    def _handle_editpost(self, event: BotEvent) -> bool:
-        if not self.db.is_user_whitelisted(event.user_id):
-            self.bot.reply_to(event.message, "Unauthorized")
-            return False
-        
-        self.bot.send_message(event.chat_id, "📝 Edit post feature:\n\nForward the message you want to edit, or use /managepost menu.")
-        return True
-    
-    def _handle_deletepost(self, event: BotEvent) -> bool:
-        if not self.db.is_user_whitelisted(event.user_id):
-            self.bot.reply_to(event.message, "Unauthorized")
-            return False
-        
-        self.bot.send_message(event.chat_id, "🗑️ Delete post feature:\n\nForward the message you want to delete, or use /managepost menu.")
-        return True
-    
-    def _handle_schedules(self, event: BotEvent) -> bool:
-        if not self.db.is_user_whitelisted(event.user_id):
-            self.bot.reply_to(event.message, "Unauthorized")
-            return False
-        
-        keyboard = KeyboardFactory.create_inline_buttons([
-            [{'text': 'scheduled posts', 'type': 'callback', 'data': 'scheduled_posts'}],
-            [{'text': 'self-destruct timings', 'type': 'callback', 'data': 'destruct_timings'}],
-            [{'text': 'cancel', 'type': 'callback', 'data': 'cancel_menu'}]
-        ])
-        self.bot.send_message(event.chat_id, "⏰ Schedules Management:", reply_markup=keyboard)
-        return True
-    
-    def _handle_permit(self, event: BotEvent) -> bool:
-        if event.user_id != BOT_OWNER_ID:
-            self.bot.reply_to(event.message, "Owner only.")
-            return False
-        
-        parts = event.message.text.split()
-        if len(parts) == 2:
-            try:
-                user_id = int(parts[1].replace('-', ''))
-                self.db.add_user_to_whitelist(user_id)
-                self.bot.reply_to(event.message, f"✅ User {user_id} permitted!")
-            except:
-                self.bot.reply_to(event.message, "❌ Invalid user ID.")
-        else:
-            self.bot.reply_to(event.message, "Format: /permit <user_id>\nExample: /permit 123456789 or /permit -123456789")
-        return True
-    
-    def _handle_remove(self, event: BotEvent) -> bool:
-        if event.user_id != BOT_OWNER_ID:
-            self.bot.reply_to(event.message, "Owner only.")
-            return False
-        
-        parts = event.message.text.split()
-        if len(parts) == 2:
-            try:
-                user_id = int(parts[1].replace('-', ''))
-                if user_id != BOT_OWNER_ID:
-                    self.db.remove_user_from_whitelist(user_id)
-                    self.bot.reply_to(event.message, f"✅ User {user_id} removed!")
-                else:
-                    self.bot.reply_to(event.message, "❌ Cannot remove owner!")
-            except:
-                self.bot.reply_to(event.message, "❌ Error removing user.")
-        else:
-            self.bot.reply_to(event.message, "Format: /remove <user_id>\nExample: /remove 123456789 or /remove -123456789")
-        return True
 
-class CallbackEventHandler(EventHandler):
-    def __init__(self, bot, db, menu_manager):
+# Menu Factory Pattern
+class MenuFactory:
+    def __init__(self, bot, db):
         self.bot = bot
         self.db = db
-        self.menu_manager = menu_manager
-        self.callback_actions = {
-            'main_menu': lambda e: self.menu_manager.show_main_reply_keyboard_menu(e.chat_id),
-            'start': lambda e: self.menu_manager.show_main_reply_keyboard_menu(e.chat_id),
-            'user_menu': lambda e: self._handle_user_menu(e),
-            'newpost': lambda e: self.menu_manager.show_newpost_inline_buttons(e.chat_id),
-            'send_menu': lambda e: self.menu_manager.show_send_inline_buttons(e.chat_id),
-            'users_list': lambda e: self._show_users_list(e.chat_id),
-            'permit_user': lambda e: self._show_permit_format(e.chat_id),
-            'remove_user': lambda e: self._show_remove_format(e.chat_id)
+        self.menus = {
+            'main_inline': MainInlineKeyboardMenuStrategy(bot, db),  # RED
+            'user_button': UserButtonMenuStrategy(bot, db),          # GREEN
+            'newpost_button': NewPostButtonMenuStrategy(bot, db),    # GREEN
+            'post_creation_button': PostCreationButtonMenuStrategy(bot, db), # GREEN
+            'managepost_button': ManagePostButtonMenuStrategy(bot, db), # GREEN
+            'schedules_button': SchedulesButtonMenuStrategy(bot, db), # GREEN
+            'send_inline': SendInlineButtonsStrategy(bot, db),       # BLUE
+            'cancel_inline': CancelInlineButtonsStrategy(bot, db)    # BLUE
         }
-        
-        self.simple_messages = {
-            'schedule_post': "📅 Schedule post format:\n\nDD/MM/YYYY HH:MM (24hr format IST)\nExample: 15/10/2025 14:30\n\nSchedule at same day if date not mentioned",
-            'self_destruct': "⏰ Self-destruct format:\n\nDD/MM/YYYY HH:MM (24hr format IST)\nExample: 15/10/2025 14:30\n\nSet at same day if date not mentioned",
-            'post_now': "📤 Sends the post instantly... (Feature coming soon)",
-            'cancel_post': "❌ Cancel current task",
-            'preview_post': "👁️ Shows post preview... (Feature coming soon)",
-            'delete_all': "🗑️ Delete the draft/editing post... (Feature coming soon)",
-            'edit_existing': "📝 Edit a post on the channel like @controlerbot... (Feature coming soon)",
-            'delete_existing': "🗑️ Delete a post on the channel... (Feature coming soon)"
+    
+    def get_menu(self, menu_type: str) -> MenuStrategy:
+        return self.menus.get(menu_type, self.menus['main_inline'])
+
+# Event Handlers
+class CommandEventHandler(EventHandler):
+    def __init__(self, bot, db, menu_factory):
+        self.bot = bot
+        self.db = db
+        self.menu_factory = menu_factory
+        self.commands = {
+            'start': StartCommandStrategy(bot, db, menu_factory),
+            'help': HelpCommandStrategy(bot, db, menu_factory)
         }
+    
+    def can_handle(self, event: BotEvent) -> bool:
+        return event.event_type == 'command'
+    
+    def handle(self, event: BotEvent) -> bool:
+        command = event.data
+        strategy = self.commands.get(command)
+        return strategy.execute(event) if strategy else False
+
+class CallbackEventHandler(EventHandler):
+    def __init__(self, bot, db, menu_factory):
+        self.bot = bot
+        self.db = db
+        self.menu_factory = menu_factory
+        self.user_states = {}  # Track user button menu states
     
     def can_handle(self, event: BotEvent) -> bool:
         return event.event_type == 'callback'
@@ -389,29 +318,142 @@ class CallbackEventHandler(EventHandler):
     def handle(self, event: BotEvent) -> bool:
         callback_data = event.data
         
-        # Handle channel selection
-        if callback_data.startswith('channel_'):
+        # Main inline keyboard menu callbacks (RED CIRCLE)
+        if callback_data == "main_menu" or callback_data == "start":
+            self._hide_button_menu(event.chat_id)
+            self.menu_factory.get_menu('main_inline').show_menu(event.chat_id)
+            return True
+        elif callback_data == "user_menu":
+            if event.user_id == BOT_OWNER_ID:
+                self.menu_factory.get_menu('user_button').show_menu(event.chat_id)  # GREEN
+                self.user_states[event.chat_id] = "user_menu"
+            return True
+        elif callback_data == "newpost":
+            self.menu_factory.get_menu('newpost_button').show_menu(event.chat_id)  # GREEN
+            return True
+        elif callback_data == "managepost":
+            self.menu_factory.get_menu('managepost_button').show_menu(event.chat_id)  # GREEN
+            self.user_states[event.chat_id] = "managepost_menu"
+            return True
+        elif callback_data == "schedules":
+            self.menu_factory.get_menu('schedules_button').show_menu(event.chat_id)  # GREEN
+            self.user_states[event.chat_id] = "schedules_menu"
+            return True
+        
+        # Channel selection callbacks
+        elif callback_data.startswith('channel_'):
             channel = callback_data.replace('channel_', '')
-            self.menu_manager.show_post_creation_button_menu(event.chat_id, channel)
+            self.menu_factory.get_menu('post_creation_button').show_menu(event.chat_id, channel=channel)  # GREEN
+            self.user_states[event.chat_id] = "post_creation_menu"
             return True
         
-        # Handle callback actions
-        action = self.callback_actions.get(callback_data)
-        if action:
-            action(event)
+        # Inline button callbacks (BLUE CIRCLE)
+        elif callback_data == "schedule_post":
+            self.bot.send_message(event.chat_id, "📅 Schedule post format:\n\nDD/MM/YYYY HH:MM (24hr format IST)\nExample: 15/10/2025 14:30\n\nSchedule at same day if date not mentioned")
+            self._hide_button_menu(event.chat_id)
             return True
-        
-        # Handle simple messages
-        message = self.simple_messages.get(callback_data)
-        if message:
-            self.bot.send_message(event.chat_id, message)
+        elif callback_data == "self_destruct":
+            self.bot.send_message(event.chat_id, "⏰ Self-destruct format:\n\nDD/MM/YYYY HH:MM (24hr format IST)\nExample: 15/10/2025 14:30\n\nSet at same day if date not mentioned")
+            self._hide_button_menu(event.chat_id)
+            return True
+        elif callback_data == "post_now":
+            self.bot.send_message(event.chat_id, "📤 Sends the post instantly... (Feature coming soon)")
+            self._hide_button_menu(event.chat_id)
+            return True
+        elif callback_data == "cancel_destruct":
+            self.bot.send_message(event.chat_id, "❌ Self-destruct cancelled")
+            self._hide_button_menu(event.chat_id)
+            return True
+        elif callback_data == "cancel_scheduled":
+            self.bot.send_message(event.chat_id, "❌ Scheduled post cancelled")
+            self._hide_button_menu(event.chat_id)
             return True
         
         return False
     
-    def _handle_user_menu(self, event: BotEvent):
-        if event.user_id == BOT_OWNER_ID:
-            self.menu_manager.show_user_button_menu(event.chat_id)
+    def _hide_button_menu(self, chat_id: int):
+        """Hide current button menu (GREEN CIRCLE)"""
+        keyboard = types.ReplyKeyboardRemove()
+        self.bot.send_message(chat_id, "Menu hidden", reply_markup=keyboard)
+        if chat_id in self.user_states:
+            del self.user_states[chat_id]
+
+class MessageEventHandler(EventHandler):
+    def __init__(self, bot, db, menu_factory, callback_handler):
+        self.bot = bot
+        self.db = db
+        self.menu_factory = menu_factory
+        self.callback_handler = callback_handler
+    
+    def can_handle(self, event: BotEvent) -> bool:
+        return event.event_type == 'message'
+    
+    def handle(self, event: BotEvent) -> bool:
+        text = event.data
+        chat_id = event.chat_id
+        current_state = self.callback_handler.user_states.get(chat_id, "")
+        
+        # Handle button menu messages (GREEN CIRCLE responses)
+        if current_state == "user_menu":
+            return self._handle_user_menu_buttons(event, text)
+        elif current_state == "post_creation_menu":
+            return self._handle_post_creation_buttons(event, text)
+        elif current_state == "managepost_menu":
+            return self._handle_managepost_buttons(event, text)
+        elif current_state == "schedules_menu":
+            return self._handle_schedules_buttons(event, text)
+        
+        return False
+    
+    def _handle_user_menu_buttons(self, event: BotEvent, text: str) -> bool:
+        if text == "users":
+            self._show_users_list(event.chat_id)
+        elif text == "permit <user_id>":
+            self.bot.send_message(event.chat_id, "Format: /permit <user_id>\nExample: /permit 123456789\n\nIgnores '-' before numbers (ex: -1234 or 1234)")
+        elif text == "remove <user_id>":
+            self.bot.send_message(event.chat_id, "Format: /remove <user_id>\nExample: /remove 123456789\n\nIgnores '-' before numbers (ex: -1234 or 1234)")
+        elif text == "<<back":
+            self.callback_handler._hide_button_menu(event.chat_id)
+            self.menu_factory.get_menu('main_inline').show_menu(event.chat_id)
+        return True
+    
+    def _handle_post_creation_buttons(self, event: BotEvent, text: str) -> bool:
+        if text == "send":
+            self.menu_factory.get_menu('send_inline').show_menu(event.chat_id)  # BLUE
+        elif text == "cancel":
+            self.bot.send_message(event.chat_id, "❌ Cancel current task")
+            self.callback_handler._hide_button_menu(event.chat_id)
+        elif text == "preview":
+            self.bot.send_message(event.chat_id, "👁️ Shows post preview... (Feature coming soon)")
+        elif text == "delete all":
+            self.bot.send_message(event.chat_id, "🗑️ Delete the draft/editing post... (Feature coming soon)")
+            self.callback_handler._hide_button_menu(event.chat_id)
+        elif text == "<<back":
+            self.callback_handler._hide_button_menu(event.chat_id)
+            self.menu_factory.get_menu('main_inline').show_menu(event.chat_id)
+        return True
+    
+    def _handle_managepost_buttons(self, event: BotEvent, text: str) -> bool:
+        if text == "edit post":
+            self.bot.send_message(event.chat_id, "📝 Edit a post on the channel like @controlerbot... (Feature coming soon)")
+        elif text == "delete post":
+            self.bot.send_message(event.chat_id, "🗑️ Delete a post on the channel... (Feature coming soon)")
+        elif text == "<<back":
+            self.callback_handler._hide_button_menu(event.chat_id)
+            self.menu_factory.get_menu('main_inline').show_menu(event.chat_id)
+        return True
+    
+    def _handle_schedules_buttons(self, event: BotEvent, text: str) -> bool:
+        if text == "scheduled posts":
+            self._show_scheduled_posts(event.chat_id)
+        elif text == "self-destruct timings":
+            self._show_destruct_timings(event.chat_id)
+        elif text == "cancel":
+            self.menu_factory.get_menu('cancel_inline').show_menu(event.chat_id)  # BLUE
+        elif text == "<<back":
+            self.callback_handler._hide_button_menu(event.chat_id)
+            self.menu_factory.get_menu('main_inline').show_menu(event.chat_id)
+        return True
     
     def _show_users_list(self, chat_id: int):
         users = self.db.get_whitelisted_users()
@@ -428,29 +470,53 @@ class CallbackEventHandler(EventHandler):
             name = first_name or "Unknown"
             user_list += f"{name} @{current_username}\nID: {user_id}\n\n"
         
-        keyboard = KeyboardFactory.create_inline_buttons([
-            [{'text': '<<back', 'type': 'callback', 'data': 'user_menu'}]
-        ])
-        self.bot.send_message(chat_id, user_list, reply_markup=keyboard)
+        self.bot.send_message(chat_id, user_list)
     
-    def _show_permit_format(self, chat_id: int):
-        self.bot.send_message(chat_id, "Format: /permit <user_id>\nExample: /permit 123456789\n\nIgnores '-' before numbers (ex: -1234 or 1234)")
+    def _show_scheduled_posts(self, chat_id: int):
+        posts = self.db.get_scheduled_posts()
+        if posts:
+            post_list = f"📋 Scheduled Posts ({len(posts)}):\n\n"
+            for post in posts:
+                post_list += f"Channel: {post['channel_name']}\n"
+                post_list += f"Time: {post['scheduled_time']}\n"
+                post_list += f"Content: {post['content'][:50]}...\n\n"
+        else:
+            post_list = "📋 No scheduled posts found."
+        
+        self.bot.send_message(chat_id, post_list)
     
-    def _show_remove_format(self, chat_id: int):
-        self.bot.send_message(chat_id, "Format: /remove <user_id>\nExample: /remove 123456789\n\nIgnores '-' before numbers (ex: -1234 or 1234)")
+    def _show_destruct_timings(self, chat_id: int):
+        posts = self.db.get_scheduled_posts()
+        destruct_posts = [p for p in posts if p['is_self_destruct']]
+        
+        if destruct_posts:
+            post_list = f"⏰ Self-Destruct Posts ({len(destruct_posts)}):\n\n"
+            for post in destruct_posts:
+                post_list += f"Channel: {post['channel_name']}\n"
+                post_list += f"Destruct Time: {post['self_destruct_time']}\n"
+                post_list += f"Content: {post['content'][:50]}...\n\n"
+        else:
+            post_list = "⏰ No self-destruct posts found."
+        
+        self.bot.send_message(chat_id, post_list)
 
+# Main Bot Handler
 class BotHandlers:
     def __init__(self, database_manager):
         self.db = database_manager
         self.bot = telebot.TeleBot(BOT_TOKEN, threaded=True)
         
-        # Initialize components
-        self.menu_manager = MenuManager(self.bot, self.db)
+        # Initialize architecture
+        self.menu_factory = MenuFactory(self.bot, self.db)
         self.event_dispatcher = EventDispatcher()
         
+        # Create handlers with proper dependencies
+        self.callback_handler = CallbackEventHandler(self.bot, self.db, self.menu_factory)
+        
         # Register event handlers
-        self.event_dispatcher.register_handler(CommandEventHandler(self.bot, self.db, self.menu_manager))
-        self.event_dispatcher.register_handler(CallbackEventHandler(self.bot, self.db, self.menu_manager))
+        self.event_dispatcher.register_handler(CommandEventHandler(self.bot, self.db, self.menu_factory))
+        self.event_dispatcher.register_handler(self.callback_handler)
+        self.event_dispatcher.register_handler(MessageEventHandler(self.bot, self.db, self.menu_factory, self.callback_handler))
         
         # Setup bot
         self._setup_commands()
@@ -484,31 +550,54 @@ class BotHandlers:
         logger.info("✅ All commands recreated and updated!")
     
     def _register_handlers(self):
-        @self.bot.message_handler(commands=['start', 'help', 'dashboard', 'user', 'newpost', 'managepost', 'editpost', 'deletepost', 'schedules', 'permit', 'remove'])
-        def handle_commands(message):
-            command = message.text[1:].split()[0]  # Extract command without '/'
-            event = BotEvent('command', message.from_user.id, message.chat.id, command, message)
+        @self.bot.message_handler(commands=['start'])
+        def handle_start(message):
+            event = BotEvent('command', message.from_user.id, message.chat.id, 'start', message)
             self.event_dispatcher.dispatch(event)
         
-        @self.bot.message_handler(content_types=['text'])
-        def handle_text_messages(message):
-            # Handle reply keyboard button presses (from native menu)
-            text = message.text.lower()
+        @self.bot.message_handler(commands=['help'])
+        def handle_help(message):
+            event = BotEvent('command', message.from_user.id, message.chat.id, 'help', message)
+            self.event_dispatcher.dispatch(event)
+        
+        @self.bot.message_handler(commands=['user'])
+        def handle_user(message):
+            if message.from_user.id != BOT_OWNER_ID:
+                self.bot.reply_to(message, "Owner only.")
+                return
+            self.menu_factory.get_menu('user_button').show_menu(message.chat.id)
+            self.callback_handler.user_states[message.chat.id] = "user_menu"
+        
+        @self.bot.message_handler(commands=['newpost'])
+        def handle_newpost(message):
+            if not self.db.is_user_whitelisted(message.from_user.id):
+                self.bot.reply_to(message, "Unauthorized")
+                return
+            self.menu_factory.get_menu('newpost_button').show_menu(message.chat.id)
+        
+        @self.bot.message_handler(commands=['managepost'])
+        def handle_managepost(message):
+            if not self.db.is_user_whitelisted(message.from_user.id):
+                self.bot.reply_to(message, "Unauthorized")
+                return
+            self.menu_factory.get_menu('managepost_button').show_menu(message.chat.id)
+            self.callback_handler.user_states[message.chat.id] = "managepost_menu"
+        
+        @self.bot.message_handler(commands=['schedules'])
+        def handle_schedules(message):
+            if not self.db.is_user_whitelisted(message.from_user.id):
+                self.bot.reply_to(message, "Unauthorized")
+                return
+            self.menu_factory.get_menu('schedules_button').show_menu(message.chat.id)
+            self.callback_handler.user_states[message.chat.id] = "schedules_menu"
+        
+        @self.bot.message_handler(func=lambda message: True)
+        def handle_message(message):
+            if not self.db.is_user_whitelisted(message.from_user.id):
+                return
             
-            # Map reply keyboard button text to callback data
-            button_map = {
-                'start': 'start',
-                'user': 'user_menu', 
-                'newpost': 'newpost',
-                'managepost': 'managepost',
-                'schedules': 'schedules',
-                'dashboard': 'dashboard'
-            }
-            
-            callback_data = button_map.get(text)
-            if callback_data:
-                event = BotEvent('callback', message.from_user.id, message.chat.id, callback_data, message)
-                self.event_dispatcher.dispatch(event)
+            event = BotEvent('message', message.from_user.id, message.chat.id, message.text, message)
+            self.event_dispatcher.dispatch(event)
         
         @self.bot.callback_query_handler(func=lambda call: True)
         def handle_callback(call):
